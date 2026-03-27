@@ -1,0 +1,14 @@
+node_modules/
+.env
+downloads/
+transcripts/
+input/*.mp4
+input/*.mp3
+input/*.wav
+input/*.m4a
+input/*.webm
+input/*.avi
+input/*.mov
+input/*.mkv
+*-player-script.js
+.idea/

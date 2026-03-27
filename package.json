@@ -1,0 +1,27 @@
+{
+  "name": "video-audio-transcriber",
+  "version": "1.0.0",
+  "description": "Transcribe YouTube videos and local audio/video files using Groq Whisper API",
+  "main": "transcribe.js",
+  "type": "module",
+  "scripts": {
+    "transcribe": "node transcribe.js",
+    "scan": "node transcribe.js scan",
+    "scan_ru": "node transcribe.js scan ru",
+    "scan_en": "node transcribe.js scan en"
+  },
+  "keywords": [
+    "transcription",
+    "whisper",
+    "youtube",
+    "audio",
+    "video"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "execa": "^9.5.2",
+    "groq-sdk": "^0.37.0"
+  }
+}
