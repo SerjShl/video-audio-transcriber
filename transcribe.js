@@ -35,7 +35,18 @@ async function downloadYouTube(url) {
   console.log('⬇️  Скачивание с YouTube...');
   const outputPath = path.join(DIRS.downloads, 'audio_%(id)s.%(ext)s');
 
-  await execa('yt-dlp', ['-x', '--audio-format', 'mp3', '-o', outputPath, url]);
+  const args = ['-x', '--audio-format', 'mp3', '-o', outputPath];
+
+  // Если YouTube требует "Sign in to confirm you're not a bot",
+  // укажите браузер в .env: YT_DLP_BROWSER=chrome (или edge, firefox, brave)
+  const browser = process.env.YT_DLP_BROWSER;
+  if (browser) {
+    console.log(`🍪 Использую cookies из браузера: ${browser}`);
+    args.push('--cookies-from-browser', browser);
+  }
+
+  args.push(url);
+  await execa('yt-dlp', args);
 
   const files = fs.readdirSync(DIRS.downloads).filter(f => f.startsWith('audio_'));
   return path.join(DIRS.downloads, files[files.length - 1]);
