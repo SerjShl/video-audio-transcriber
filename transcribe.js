@@ -22,6 +22,10 @@ Object.values(DIRS).forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Лимит Groq — 25 MB. Берём с запасом, чтобы не упереться на границе.
+const MAX_FILE_SIZE_MB = 24;
+const WHISPER_MODEL = 'whisper-large-v3-turbo';
+
 function formatText(text) {
   return text
     .replace(/\. /g, '.\n\n')
@@ -45,11 +49,19 @@ async function downloadYouTube(url) {
     args.push('--cookies-from-browser', browser);
   }
 
-  args.push(url);
-  await execa('yt-dlp', args);
+  // --print after_move:filepath печатает итоговый путь после пост-обработки,
+  // --no-simulate заставляет yt-dlp всё равно скачивать. Так мы получаем точное
+  // имя файла, а не угадываем «последний по алфавиту» в папке downloads.
+  args.push('--print', 'after_move:filepath', '--no-simulate', url);
 
-  const files = fs.readdirSync(DIRS.downloads).filter(f => f.startsWith('audio_'));
-  return path.join(DIRS.downloads, files[files.length - 1]);
+  const { stdout } = await execa('yt-dlp', args);
+  const lines = stdout.split('\n').map(l => l.trim()).filter(Boolean);
+  const filePath = lines[lines.length - 1];
+
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error('Не удалось определить путь к скачанному файлу');
+  }
+  return filePath;
 }
 
 async function convertToAudio(inputPath) {
@@ -73,43 +85,92 @@ async function convertToAudio(inputPath) {
   }
 }
 
+function sizeMB(filePath) {
+  return fs.statSync(filePath).size / (1024 * 1024);
+}
+
+async function getDuration(filePath) {
+  const { stdout } = await execa('ffprobe', [
+    '-v', 'error',
+    '-show_entries', 'format=duration',
+    '-of', 'default=noprint_wrappers=1:nokey=1',
+    filePath
+  ]);
+  return parseFloat(stdout.trim());
+}
+
+// Нарезает аудио на части ~chunkSeconds каждая (без перекодирования — быстро).
+async function splitAudio(inputPath, chunkSeconds) {
+  const parsed = path.parse(inputPath);
+  const pattern = path.join(parsed.dir, `${parsed.name}_chunk_%03d.mp3`);
+
+  await execa('ffmpeg', [
+    '-i', inputPath,
+    '-f', 'segment',
+    '-segment_time', String(chunkSeconds),
+    '-c', 'copy',
+    '-y',
+    pattern
+  ]);
+
+  return fs.readdirSync(parsed.dir)
+    .filter(f => f.startsWith(`${parsed.name}_chunk_`))
+    .sort()
+    .map(f => path.join(parsed.dir, f));
+}
+
+async function transcribeChunk(audioPath, language) {
+  const result = await groq.audio.transcriptions.create({
+    file: fs.createReadStream(audioPath),
+    model: WHISPER_MODEL,
+    language: language,
+    response_format: 'verbose_json'
+  });
+  return result.text;
+}
+
 async function transcribe(audioPath, language = 'ru') {
   console.log(`🎤 Транскрибация через Groq (язык: ${language})...`);
 
-  const stats = fs.statSync(audioPath);
-  const fileSizeMB = stats.size / (1024 * 1024);
-
-  let processPath = audioPath;
-  let needsCleanup = false;
-
-  if (fileSizeMB > 25) {
-    console.log(`⚠️  Файл ${fileSizeMB.toFixed(1)} MB (больше лимита 25 MB)`);
-    processPath = await convertToAudio(audioPath);
-    needsCleanup = true;
-
-    const newStats = fs.statSync(processPath);
-    const newSizeMB = newStats.size / (1024 * 1024);
-    console.log(`✅ После конвертации: ${newSizeMB.toFixed(1)} MB`);
-
-    if (newSizeMB > 25) {
-      if (needsCleanup) fs.unlinkSync(processPath);
-      throw new Error('Файл слишком большой даже после конвертации. Попробуйте разделить его на части.');
-    }
+  // Файл в пределах лимита — отправляем как есть.
+  if (sizeMB(audioPath) <= MAX_FILE_SIZE_MB) {
+    return transcribeChunk(audioPath, language);
   }
 
-  try {
-    const result = await groq.audio.transcriptions.create({
-      file: fs.createReadStream(processPath),
-      model: 'whisper-large-v3-turbo',
-      language: language,
-      response_format: 'verbose_json'
-    });
+  // Иначе сжимаем в 16kHz mono 32kbps — этого хватает Whisper и резко уменьшает размер.
+  console.log(`⚠️  Файл ${sizeMB(audioPath).toFixed(1)} MB (больше лимита ${MAX_FILE_SIZE_MB} MB), сжимаю...`);
+  const compressedPath = await convertToAudio(audioPath);
+  const cleanup = [compressedPath];
 
-    if (needsCleanup) fs.unlinkSync(processPath);
-    return result.text;
-  } catch (error) {
-    if (needsCleanup) fs.unlinkSync(processPath);
-    throw error;
+  try {
+    const compressedMB = sizeMB(compressedPath);
+    console.log(`✅ После сжатия: ${compressedMB.toFixed(1)} MB`);
+
+    if (compressedMB <= MAX_FILE_SIZE_MB) {
+      return await transcribeChunk(compressedPath, language);
+    }
+
+    // Всё ещё больше лимита (длинная запись) — режем на части и склеиваем результат.
+    const duration = await getDuration(compressedPath);
+    const numChunks = Math.ceil(compressedMB / MAX_FILE_SIZE_MB);
+    const chunkSeconds = Math.ceil(duration / numChunks);
+    console.log(`✂️  Длинная запись (${Math.round(duration / 60)} мин) — нарежу на ${numChunks} частей по ~${Math.round(chunkSeconds / 60)} мин`);
+
+    const chunks = await splitAudio(compressedPath, chunkSeconds);
+    cleanup.push(...chunks);
+
+    // ffmpeg может оставить пустой «хвостовой» сегмент в пару КБ из-за остатка
+    // по времени — отсеиваем его, чтобы не тратить лишний запрос к Groq.
+    const realChunks = chunks.filter(f => fs.statSync(f).size > 2048);
+
+    const parts = [];
+    for (let i = 0; i < realChunks.length; i++) {
+      console.log(`   🎤 Часть ${i + 1}/${realChunks.length}...`);
+      parts.push(await transcribeChunk(realChunks[i], language));
+    }
+    return parts.join(' ');
+  } finally {
+    cleanup.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
   }
 }
 
@@ -154,10 +215,22 @@ async function main() {
         /\.(mp4|mp3|wav|m4a|webm)$/i.test(f)
       );
 
+      let ok = 0;
+      const failed = [];
       for (const file of files) {
         console.log(`\n▶️  ${file}`);
-        await processFile(path.join(DIRS.input, file), path.parse(file).name, language);
+        try {
+          await processFile(path.join(DIRS.input, file), path.parse(file).name, language);
+          ok++;
+        } catch (error) {
+          // Ошибка одного файла не должна прерывать всю пачку.
+          failed.push(file);
+          console.error(`❌ Пропущен ${file}: ${error.message}`);
+        }
       }
+
+      console.log(`\n📊 Готово: успешно ${ok}, с ошибками ${failed.length}`);
+      if (failed.length) console.log(`   Не обработаны: ${failed.join(', ')}`);
       return;
     }
 
