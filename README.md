@@ -68,6 +68,16 @@ It handles the tedious parts for you: downloading, converting to audio, compress
 
 Double-click `start.bat` (Windows) or run:
 
+### Интерактивный режим (проще всего)
+
+Двойной клик по `start.bat` (Windows) или:
+```bash
+npm start
+```
+Скрипт спросит ссылку (или путь к файлу) и язык по очереди. Пустая ссылка — обработает папку `input/`.
+
+### Через аргументы
+
 ```bash
 npm start
 ```
