@@ -22,36 +22,50 @@ Object.values(DIRS).forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
-// Лимит Groq — 25 MB. Берём с запасом, чтобы не упереться на границе.
 const MAX_FILE_SIZE_MB = 24;
 const WHISPER_MODEL = 'whisper-large-v3-turbo';
+const PARAGRAPH_MIN_CHARS = 280;
 
-function formatText(text) {
-  return text
-    .replace(/\. /g, '.\n\n')
-    .replace(/\? /g, '?\n\n')
-    .replace(/! /g, '!\n\n')
-    .replace(/,([^\s])/g, ', $1')
-    .trim();
+async function ensureCommand(cmd, versionArg, hint) {
+  try {
+    await execa(cmd, [versionArg]);
+  } catch {
+    throw new Error(`Не найдена утилита "${cmd}" в PATH. ${hint}`);
+  }
 }
 
-async function downloadYouTube(url) {
-  console.log('⬇️  Скачивание с YouTube...');
+function formatTranscript(segments) {
+  const paragraphs = [];
+  let current = '';
+
+  for (const seg of segments) {
+    const piece = (seg.text || '').trim();
+    if (!piece) continue;
+
+    current = current ? `${current} ${piece}` : piece;
+
+    if (current.length >= PARAGRAPH_MIN_CHARS && /[.!?…]$/.test(piece)) {
+      paragraphs.push(current);
+      current = '';
+    }
+  }
+
+  if (current) paragraphs.push(current);
+  return paragraphs.join('\n\n');
+}
+
+async function downloadMedia(url) {
+  console.log('⬇️  Скачивание...');
   const outputPath = path.join(DIRS.downloads, 'audio_%(id)s.%(ext)s');
 
   const args = ['-x', '--audio-format', 'mp3', '-o', outputPath];
 
-  // Если YouTube требует "Sign in to confirm you're not a bot",
-  // укажите браузер в .env: YT_DLP_BROWSER=chrome (или edge, firefox, brave)
   const browser = process.env.YT_DLP_BROWSER;
   if (browser) {
     console.log(`🍪 Использую cookies из браузера: ${browser}`);
     args.push('--cookies-from-browser', browser);
   }
 
-  // --print after_move:filepath печатает итоговый путь после пост-обработки,
-  // --no-simulate заставляет yt-dlp всё равно скачивать. Так мы получаем точное
-  // имя файла, а не угадываем «последний по алфавиту» в папке downloads.
   args.push('--print', 'after_move:filepath', '--no-simulate', url);
 
   const { stdout } = await execa('yt-dlp', args);
@@ -99,7 +113,6 @@ async function getDuration(filePath) {
   return parseFloat(stdout.trim());
 }
 
-// Нарезает аудио на части ~chunkSeconds каждая (без перекодирования — быстро).
 async function splitAudio(inputPath, chunkSeconds) {
   const parsed = path.parse(inputPath);
   const pattern = path.join(parsed.dir, `${parsed.name}_chunk_%03d.mp3`);
@@ -126,18 +139,17 @@ async function transcribeChunk(audioPath, language) {
     language: language,
     response_format: 'verbose_json'
   });
-  return result.text;
+
+  return result.segments?.length ? result.segments : [{ text: result.text }];
 }
 
 async function transcribe(audioPath, language = 'ru') {
   console.log(`🎤 Транскрибация через Groq (язык: ${language})...`);
 
-  // Файл в пределах лимита — отправляем как есть.
   if (sizeMB(audioPath) <= MAX_FILE_SIZE_MB) {
     return transcribeChunk(audioPath, language);
   }
 
-  // Иначе сжимаем в 16kHz mono 32kbps — этого хватает Whisper и резко уменьшает размер.
   console.log(`⚠️  Файл ${sizeMB(audioPath).toFixed(1)} MB (больше лимита ${MAX_FILE_SIZE_MB} MB), сжимаю...`);
   const compressedPath = await convertToAudio(audioPath);
   const cleanup = [compressedPath];
@@ -150,7 +162,6 @@ async function transcribe(audioPath, language = 'ru') {
       return await transcribeChunk(compressedPath, language);
     }
 
-    // Всё ещё больше лимита (длинная запись) — режем на части и склеиваем результат.
     const duration = await getDuration(compressedPath);
     const numChunks = Math.ceil(compressedMB / MAX_FILE_SIZE_MB);
     const chunkSeconds = Math.ceil(duration / numChunks);
@@ -159,33 +170,31 @@ async function transcribe(audioPath, language = 'ru') {
     const chunks = await splitAudio(compressedPath, chunkSeconds);
     cleanup.push(...chunks);
 
-    // ffmpeg может оставить пустой «хвостовой» сегмент в пару КБ из-за остатка
-    // по времени — отсеиваем его, чтобы не тратить лишний запрос к Groq.
     const realChunks = chunks.filter(f => fs.statSync(f).size > 2048);
 
-    const parts = [];
+    const segments = [];
     for (let i = 0; i < realChunks.length; i++) {
       console.log(`   🎤 Часть ${i + 1}/${realChunks.length}...`);
-      parts.push(await transcribeChunk(realChunks[i], language));
+      segments.push(...await transcribeChunk(realChunks[i], language));
     }
-    return parts.join(' ');
+    return segments;
   } finally {
     cleanup.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
   }
 }
 
-function saveTranscript(filename, text) {
-  const formattedText = formatText(text);
+function saveTranscript(filename, segments) {
+  const text = formatTranscript(segments);
   const txtPath = path.join(DIRS.transcripts, `${filename}.txt`);
 
-  fs.writeFileSync(txtPath, formattedText);
+  fs.writeFileSync(txtPath, text);
   console.log(`\n✅ Сохранено: ${txtPath}\n`);
-  console.log(formattedText.substring(0, 500) + (formattedText.length > 500 ? '...' : ''));
+  console.log(text.substring(0, 500) + (text.length > 500 ? '...' : ''));
 }
 
 async function processFile(audioPath, filename, language = 'ru') {
-  const text = await transcribe(audioPath, language);
-  saveTranscript(filename, text);
+  const segments = await transcribe(audioPath, language);
+  saveTranscript(filename, segments);
 }
 
 async function main() {
@@ -193,7 +202,7 @@ async function main() {
 
   if (!input) {
     console.log('Использование:');
-    console.log('  npm run transcribe <YouTube URL> [язык]');
+    console.log('  npm run transcribe <URL> [язык]');
     console.log('  npm run transcribe <путь к файлу> [язык]');
     console.log('  npm run transcribe scan [язык]');
     console.log('\nПримеры:');
@@ -210,6 +219,14 @@ async function main() {
   }
 
   try {
+    const isUrl = /^https?:\/\//i.test(input);
+
+    await ensureCommand('ffmpeg', '-version', 'Установите FFmpeg: https://ffmpeg.org/download.html');
+    await ensureCommand('ffprobe', '-version', 'ffprobe входит в состав FFmpeg.');
+    if (isUrl) {
+      await ensureCommand('yt-dlp', '--version', 'Установите yt-dlp: https://github.com/yt-dlp/yt-dlp');
+    }
+
     if (input === 'scan') {
       const files = fs.readdirSync(DIRS.input).filter(f =>
         /\.(mp4|mp3|wav|m4a|webm)$/i.test(f)
@@ -223,7 +240,6 @@ async function main() {
           await processFile(path.join(DIRS.input, file), path.parse(file).name, language);
           ok++;
         } catch (error) {
-          // Ошибка одного файла не должна прерывать всю пачку.
           failed.push(file);
           console.error(`❌ Пропущен ${file}: ${error.message}`);
         }
@@ -234,8 +250,8 @@ async function main() {
       return;
     }
 
-    if (input.includes('youtube.com') || input.includes('youtu.be')) {
-      const audioPath = await downloadYouTube(input);
+    if (isUrl) {
+      const audioPath = await downloadMedia(input);
       await processFile(audioPath, path.parse(audioPath).name, language);
       fs.unlinkSync(audioPath);
       return;
