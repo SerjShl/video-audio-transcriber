@@ -5,6 +5,7 @@
   "main": "transcribe.js",
   "type": "module",
   "scripts": {
+    "start": "node transcribe.js --interactive",
     "transcribe": "node transcribe.js",
     "scan": "node transcribe.js scan",
     "scan_ru": "node transcribe.js scan ru",

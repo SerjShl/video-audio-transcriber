@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline/promises';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { execa } from 'execa';
@@ -202,6 +203,17 @@ async function processFile(audioPath, filename, language = 'ru') {
   saveTranscript(filename, segments);
 }
 
+async function askInteractive() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const input = (await rl.question('🔗 Ссылка или путь к файлу (Enter — папка input/): ')).trim();
+    const language = (await rl.question('🌐 Язык [ru]: ')).trim() || 'ru';
+    return { input: input || 'scan', language };
+  } finally {
+    rl.close();
+  }
+}
+
 async function runPool(items, limit, worker) {
   const results = [];
   let index = 0;
@@ -221,10 +233,16 @@ async function runPool(items, limit, worker) {
 async function main() {
   const rawArgs = process.argv.slice(2);
   const keepAudio = rawArgs.includes('--keep') || process.env.KEEP_AUDIO === 'true';
-  const [input, language = 'ru'] = rawArgs.filter(a => !a.startsWith('--'));
+  const isInteractive = rawArgs.includes('--interactive') || rawArgs.includes('-i');
+  let [input, language = 'ru'] = rawArgs.filter(a => !a.startsWith('-'));
+
+  if (isInteractive) {
+    ({ input, language } = await askInteractive());
+  }
 
   if (!input) {
     console.log('Использование:');
+    console.log('  npm start                                  (интерактивный режим)');
     console.log('  npm run transcribe <URL> [язык] [--keep]');
     console.log('  npm run transcribe <путь к файлу> [язык]');
     console.log('  npm run transcribe scan [язык]');
@@ -233,7 +251,8 @@ async function main() {
     console.log('  npm run transcribe https://youtube.com/... ru');
     console.log('  npm run transcribe scan en');
     console.log('\nФлаги:');
-    console.log('  --keep   не удалять скачанное аудио после транскрибации\n');
+    console.log('  --keep          не удалять скачанное аудио после транскрибации');
+    console.log('  -i, --interactive   спросить ссылку и язык по очереди\n');
     return;
   }
 
