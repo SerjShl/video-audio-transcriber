@@ -25,6 +25,11 @@ Object.values(DIRS).forEach(dir => {
 const MAX_FILE_SIZE_MB = 24;
 const WHISPER_MODEL = 'whisper-large-v3-turbo';
 const PARAGRAPH_MIN_CHARS = 280;
+const MIN_CHUNK_BYTES = 2048;
+const AUDIO_SAMPLE_RATE = '16000';
+const AUDIO_CHANNELS = '1';
+const AUDIO_BITRATE = '32k';
+const SCAN_CONCURRENCY = Number(process.env.SCAN_CONCURRENCY) || 3;
 
 async function ensureCommand(cmd, versionArg, hint) {
   try {
@@ -87,9 +92,9 @@ async function convertToAudio(inputPath) {
     await execa('ffmpeg', [
       '-i', inputPath,
       '-vn',
-      '-ar', '16000',
-      '-ac', '1',
-      '-b:a', '32k',
+      '-ar', AUDIO_SAMPLE_RATE,
+      '-ac', AUDIO_CHANNELS,
+      '-b:a', AUDIO_BITRATE,
       '-y',
       outputPath
     ]);
@@ -170,7 +175,7 @@ async function transcribe(audioPath, language = 'ru') {
     const chunks = await splitAudio(compressedPath, chunkSeconds);
     cleanup.push(...chunks);
 
-    const realChunks = chunks.filter(f => fs.statSync(f).size > 2048);
+    const realChunks = chunks.filter(f => fs.statSync(f).size > MIN_CHUNK_BYTES);
 
     const segments = [];
     for (let i = 0; i < realChunks.length; i++) {
@@ -197,18 +202,38 @@ async function processFile(audioPath, filename, language = 'ru') {
   saveTranscript(filename, segments);
 }
 
+async function runPool(items, limit, worker) {
+  const results = [];
+  let index = 0;
+
+  async function next() {
+    const i = index++;
+    if (i >= items.length) return;
+    results[i] = await worker(items[i], i);
+    return next();
+  }
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, () => next());
+  await Promise.all(runners);
+  return results;
+}
+
 async function main() {
-  const [input, language = 'ru'] = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  const keepAudio = rawArgs.includes('--keep') || process.env.KEEP_AUDIO === 'true';
+  const [input, language = 'ru'] = rawArgs.filter(a => !a.startsWith('--'));
 
   if (!input) {
     console.log('Использование:');
-    console.log('  npm run transcribe <URL> [язык]');
+    console.log('  npm run transcribe <URL> [язык] [--keep]');
     console.log('  npm run transcribe <путь к файлу> [язык]');
     console.log('  npm run transcribe scan [язык]');
     console.log('\nПримеры:');
     console.log('  npm run transcribe video.mp4 en');
     console.log('  npm run transcribe https://youtube.com/... ru');
-    console.log('  npm run transcribe scan en\n');
+    console.log('  npm run transcribe scan en');
+    console.log('\nФлаги:');
+    console.log('  --keep   не удалять скачанное аудио после транскрибации\n');
     return;
   }
 
@@ -232,20 +257,20 @@ async function main() {
         /\.(mp4|mp3|wav|m4a|webm)$/i.test(f)
       );
 
-      let ok = 0;
-      const failed = [];
-      for (const file of files) {
-        console.log(`\n▶️  ${file}`);
+      console.log(`▶️  Файлов: ${files.length}, параллельно: ${SCAN_CONCURRENCY}`);
+      const results = await runPool(files, SCAN_CONCURRENCY, async (file) => {
         try {
           await processFile(path.join(DIRS.input, file), path.parse(file).name, language);
-          ok++;
+          console.log(`✅ ${file}`);
+          return { file, ok: true };
         } catch (error) {
-          failed.push(file);
           console.error(`❌ Пропущен ${file}: ${error.message}`);
+          return { file, ok: false };
         }
-      }
+      });
 
-      console.log(`\n📊 Готово: успешно ${ok}, с ошибками ${failed.length}`);
+      const failed = results.filter(r => !r.ok).map(r => r.file);
+      console.log(`\n📊 Готово: успешно ${results.length - failed.length}, с ошибками ${failed.length}`);
       if (failed.length) console.log(`   Не обработаны: ${failed.join(', ')}`);
       return;
     }
@@ -253,7 +278,11 @@ async function main() {
     if (isUrl) {
       const audioPath = await downloadMedia(input);
       await processFile(audioPath, path.parse(audioPath).name, language);
-      fs.unlinkSync(audioPath);
+      if (keepAudio) {
+        console.log(`💾 Аудио сохранено: ${audioPath}`);
+      } else {
+        fs.unlinkSync(audioPath);
+      }
       return;
     }
 
