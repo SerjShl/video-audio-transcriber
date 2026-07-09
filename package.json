@@ -1,9 +1,12 @@
 {
   "name": "video-audio-transcriber",
   "version": "1.0.0",
-  "description": "Transcribe YouTube videos and local audio/video files using Groq Whisper API",
+  "description": "Transcribe videos from a URL (YouTube and hundreds of other sites) or local audio/video files using the Groq Whisper API",
   "main": "transcribe.js",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node transcribe.js --interactive",
     "transcribe": "node transcribe.js",
@@ -13,13 +16,28 @@
   },
   "keywords": [
     "transcription",
+    "transcribe",
     "whisper",
+    "groq",
     "youtube",
+    "yt-dlp",
+    "ffmpeg",
     "audio",
-    "video"
+    "video",
+    "speech-to-text",
+    "subtitles",
+    "cli"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "SerjShl",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SerjShl/video-audio-transcriber.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SerjShl/video-audio-transcriber/issues"
+  },
+  "homepage": "https://github.com/SerjShl/video-audio-transcriber#readme",
   "dependencies": {
     "dotenv": "^16.4.5",
     "execa": "^9.5.2",

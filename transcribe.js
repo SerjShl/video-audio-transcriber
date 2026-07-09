@@ -11,7 +11,15 @@ import Groq from 'groq-sdk';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config();
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Created lazily so the tool can still print usage/help and a friendly
+// "missing key" message instead of crashing when GROQ_API_KEY is unset.
+let groqClient;
+function getGroq() {
+  if (!groqClient) {
+    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+  return groqClient;
+}
 
 const DIRS = {
   downloads: path.join(__dirname, 'downloads'),
@@ -23,6 +31,7 @@ Object.values(DIRS).forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Groq caps uploads at 25 MB; stay just under to leave headroom.
 const MAX_FILE_SIZE_MB = 24;
 const WHISPER_MODEL = 'whisper-large-v3-turbo';
 const PARAGRAPH_MIN_CHARS = 280;
@@ -31,15 +40,20 @@ const AUDIO_SAMPLE_RATE = '16000';
 const AUDIO_CHANNELS = '1';
 const AUDIO_BITRATE = '32k';
 const SCAN_CONCURRENCY = Number(process.env.SCAN_CONCURRENCY) || 3;
+const SCAN_EXTENSIONS = /\.(mp4|mp3|wav|m4a|webm)$/i;
+const DEFAULT_LANGUAGE = 'ru';
 
 async function ensureCommand(cmd, versionArg, hint) {
   try {
     await execa(cmd, [versionArg]);
   } catch {
-    throw new Error(`Не найдена утилита "${cmd}" в PATH. ${hint}`);
+    throw new Error(`Command "${cmd}" not found in PATH. ${hint}`);
   }
 }
 
+// Group Whisper segments into readable paragraphs. A paragraph closes once it
+// reaches a minimum length AND the current segment ends on sentence punctuation,
+// which avoids breaking on abbreviations or numbers.
 function formatTranscript(segments) {
   const paragraphs = [];
   let current = '';
@@ -60,15 +74,16 @@ function formatTranscript(segments) {
   return paragraphs.join('\n\n');
 }
 
+// Download media from any yt-dlp-supported URL and return the local audio path.
 async function downloadMedia(url) {
-  console.log('⬇️  Скачивание...');
+  console.log('⬇️  Downloading...');
   const outputPath = path.join(DIRS.downloads, 'audio_%(id)s.%(ext)s');
 
   const args = ['-x', '--audio-format', 'mp3', '-o', outputPath];
 
   const browser = process.env.YT_DLP_BROWSER;
   if (browser) {
-    console.log(`🍪 Использую cookies из браузера: ${browser}`);
+    console.log(`🍪 Using cookies from browser: ${browser}`);
     args.push('--cookies-from-browser', browser);
   }
 
@@ -79,13 +94,14 @@ async function downloadMedia(url) {
   const filePath = lines[lines.length - 1];
 
   if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error('Не удалось определить путь к скачанному файлу');
+    throw new Error('Could not determine the path of the downloaded file');
   }
   return filePath;
 }
 
+// Extract a compact mono audio track suitable for the Whisper API.
 async function convertToAudio(inputPath) {
-  console.log('🔄 Конвертация в аудио...');
+  console.log('🔄 Converting to audio...');
   const parsed = path.parse(inputPath);
   const outputPath = path.join(parsed.dir, `${parsed.name}_converted.mp3`);
 
@@ -101,7 +117,7 @@ async function convertToAudio(inputPath) {
     ]);
     return outputPath;
   } catch (error) {
-    throw new Error(`Ошибка конвертации: ${error.message}`);
+    throw new Error(`Conversion failed: ${error.message}`);
   }
 }
 
@@ -119,6 +135,7 @@ async function getDuration(filePath) {
   return parseFloat(stdout.trim());
 }
 
+// Split an audio file into fixed-length chunks and return their paths in order.
 async function splitAudio(inputPath, chunkSeconds) {
   const parsed = path.parse(inputPath);
   const pattern = path.join(parsed.dir, `${parsed.name}_chunk_%03d.mp3`);
@@ -139,7 +156,7 @@ async function splitAudio(inputPath, chunkSeconds) {
 }
 
 async function transcribeChunk(audioPath, language) {
-  const result = await groq.audio.transcriptions.create({
+  const result = await getGroq().audio.transcriptions.create({
     file: fs.createReadStream(audioPath),
     model: WHISPER_MODEL,
     language: language,
@@ -149,20 +166,22 @@ async function transcribeChunk(audioPath, language) {
   return result.segments?.length ? result.segments : [{ text: result.text }];
 }
 
-async function transcribe(audioPath, language = 'ru') {
-  console.log(`🎤 Транскрибация через Groq (язык: ${language})...`);
+// Transcribe an audio file, compressing and/or splitting it as needed to stay
+// within the API size limit. Returns a flat list of Whisper segments.
+async function transcribe(audioPath, language = DEFAULT_LANGUAGE) {
+  console.log(`🎤 Transcribing via Groq (language: ${language})...`);
 
   if (sizeMB(audioPath) <= MAX_FILE_SIZE_MB) {
     return transcribeChunk(audioPath, language);
   }
 
-  console.log(`⚠️  Файл ${sizeMB(audioPath).toFixed(1)} MB (больше лимита ${MAX_FILE_SIZE_MB} MB), сжимаю...`);
+  console.log(`⚠️  File is ${sizeMB(audioPath).toFixed(1)} MB (over the ${MAX_FILE_SIZE_MB} MB limit), compressing...`);
   const compressedPath = await convertToAudio(audioPath);
   const cleanup = [compressedPath];
 
   try {
     const compressedMB = sizeMB(compressedPath);
-    console.log(`✅ После сжатия: ${compressedMB.toFixed(1)} MB`);
+    console.log(`✅ After compression: ${compressedMB.toFixed(1)} MB`);
 
     if (compressedMB <= MAX_FILE_SIZE_MB) {
       return await transcribeChunk(compressedPath, language);
@@ -171,7 +190,7 @@ async function transcribe(audioPath, language = 'ru') {
     const duration = await getDuration(compressedPath);
     const numChunks = Math.ceil(compressedMB / MAX_FILE_SIZE_MB);
     const chunkSeconds = Math.ceil(duration / numChunks);
-    console.log(`✂️  Длинная запись (${Math.round(duration / 60)} мин) — нарежу на ${numChunks} частей по ~${Math.round(chunkSeconds / 60)} мин`);
+    console.log(`✂️  Long recording (${Math.round(duration / 60)} min) — splitting into ${numChunks} parts of ~${Math.round(chunkSeconds / 60)} min`);
 
     const chunks = await splitAudio(compressedPath, chunkSeconds);
     cleanup.push(...chunks);
@@ -180,7 +199,7 @@ async function transcribe(audioPath, language = 'ru') {
 
     const segments = [];
     for (let i = 0; i < realChunks.length; i++) {
-      console.log(`   🎤 Часть ${i + 1}/${realChunks.length}...`);
+      console.log(`   🎤 Part ${i + 1}/${realChunks.length}...`);
       segments.push(...await transcribeChunk(realChunks[i], language));
     }
     return segments;
@@ -194,11 +213,11 @@ function saveTranscript(filename, segments) {
   const txtPath = path.join(DIRS.transcripts, `${filename}.txt`);
 
   fs.writeFileSync(txtPath, text);
-  console.log(`\n✅ Сохранено: ${txtPath}\n`);
+  console.log(`\n✅ Saved: ${txtPath}\n`);
   console.log(text.substring(0, 500) + (text.length > 500 ? '...' : ''));
 }
 
-async function processFile(audioPath, filename, language = 'ru') {
+async function processFile(audioPath, filename, language = DEFAULT_LANGUAGE) {
   const segments = await transcribe(audioPath, language);
   saveTranscript(filename, segments);
 }
@@ -206,14 +225,15 @@ async function processFile(audioPath, filename, language = 'ru') {
 async function askInteractive() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const input = (await rl.question('🔗 Ссылка или путь к файлу (Enter — папка input/): ')).trim();
-    const language = (await rl.question('🌐 Язык [ru]: ')).trim() || 'ru';
+    const input = (await rl.question('🔗 URL or file path (Enter — scan the input/ folder): ')).trim();
+    const language = (await rl.question(`🌐 Language [${DEFAULT_LANGUAGE}]: `)).trim() || DEFAULT_LANGUAGE;
     return { input: input || 'scan', language };
   } finally {
     rl.close();
   }
 }
 
+// Run an async worker over items with a fixed concurrency limit.
 async function runPool(items, limit, worker) {
   const results = [];
   let index = 0;
@@ -230,67 +250,73 @@ async function runPool(items, limit, worker) {
   return results;
 }
 
+function printUsage() {
+  console.log('Usage:');
+  console.log('  npm start                                  (interactive mode)');
+  console.log('  npm run transcribe <URL> [language] [--keep]');
+  console.log('  npm run transcribe <file path> [language]');
+  console.log('  npm run transcribe scan [language]');
+  console.log('\nExamples:');
+  console.log('  npm run transcribe video.mp4 en');
+  console.log('  npm run transcribe https://youtube.com/... ru');
+  console.log('  npm run transcribe scan en');
+  console.log('\nFlags:');
+  console.log('  --keep              keep the downloaded audio after transcription');
+  console.log('  -i, --interactive   prompt for the URL and language step by step\n');
+}
+
+async function scanInputFolder(language) {
+  const files = fs.readdirSync(DIRS.input).filter(f => SCAN_EXTENSIONS.test(f));
+
+  console.log(`▶️  Files: ${files.length}, concurrency: ${SCAN_CONCURRENCY}`);
+  const results = await runPool(files, SCAN_CONCURRENCY, async (file) => {
+    try {
+      await processFile(path.join(DIRS.input, file), path.parse(file).name, language);
+      console.log(`✅ ${file}`);
+      return { file, ok: true };
+    } catch (error) {
+      console.error(`❌ Skipped ${file}: ${error.message}`);
+      return { file, ok: false };
+    }
+  });
+
+  const failed = results.filter(r => !r.ok).map(r => r.file);
+  console.log(`\n📊 Done: ${results.length - failed.length} succeeded, ${failed.length} failed`);
+  if (failed.length) console.log(`   Not processed: ${failed.join(', ')}`);
+}
+
 async function main() {
   const rawArgs = process.argv.slice(2);
   const keepAudio = rawArgs.includes('--keep') || process.env.KEEP_AUDIO === 'true';
   const isInteractive = rawArgs.includes('--interactive') || rawArgs.includes('-i');
-  let [input, language = 'ru'] = rawArgs.filter(a => !a.startsWith('-'));
+  let [input, language = DEFAULT_LANGUAGE] = rawArgs.filter(a => !a.startsWith('-'));
 
   if (isInteractive) {
     ({ input, language } = await askInteractive());
   }
 
   if (!input) {
-    console.log('Использование:');
-    console.log('  npm start                                  (интерактивный режим)');
-    console.log('  npm run transcribe <URL> [язык] [--keep]');
-    console.log('  npm run transcribe <путь к файлу> [язык]');
-    console.log('  npm run transcribe scan [язык]');
-    console.log('\nПримеры:');
-    console.log('  npm run transcribe video.mp4 en');
-    console.log('  npm run transcribe https://youtube.com/... ru');
-    console.log('  npm run transcribe scan en');
-    console.log('\nФлаги:');
-    console.log('  --keep          не удалять скачанное аудио после транскрибации');
-    console.log('  -i, --interactive   спросить ссылку и язык по очереди\n');
+    printUsage();
     return;
   }
 
   if (!process.env.GROQ_API_KEY) {
-    console.error('❌ Добавьте GROQ_API_KEY в .env файл');
-    console.error('   Получить ключ: https://console.groq.com/keys');
+    console.error('❌ Add GROQ_API_KEY to your .env file');
+    console.error('   Get a key: https://console.groq.com/keys');
     process.exit(1);
   }
 
   try {
     const isUrl = /^https?:\/\//i.test(input);
 
-    await ensureCommand('ffmpeg', '-version', 'Установите FFmpeg: https://ffmpeg.org/download.html');
-    await ensureCommand('ffprobe', '-version', 'ffprobe входит в состав FFmpeg.');
+    await ensureCommand('ffmpeg', '-version', 'Install FFmpeg: https://ffmpeg.org/download.html');
+    await ensureCommand('ffprobe', '-version', 'ffprobe ships with FFmpeg.');
     if (isUrl) {
-      await ensureCommand('yt-dlp', '--version', 'Установите yt-dlp: https://github.com/yt-dlp/yt-dlp');
+      await ensureCommand('yt-dlp', '--version', 'Install yt-dlp: https://github.com/yt-dlp/yt-dlp');
     }
 
     if (input === 'scan') {
-      const files = fs.readdirSync(DIRS.input).filter(f =>
-        /\.(mp4|mp3|wav|m4a|webm)$/i.test(f)
-      );
-
-      console.log(`▶️  Файлов: ${files.length}, параллельно: ${SCAN_CONCURRENCY}`);
-      const results = await runPool(files, SCAN_CONCURRENCY, async (file) => {
-        try {
-          await processFile(path.join(DIRS.input, file), path.parse(file).name, language);
-          console.log(`✅ ${file}`);
-          return { file, ok: true };
-        } catch (error) {
-          console.error(`❌ Пропущен ${file}: ${error.message}`);
-          return { file, ok: false };
-        }
-      });
-
-      const failed = results.filter(r => !r.ok).map(r => r.file);
-      console.log(`\n📊 Готово: успешно ${results.length - failed.length}, с ошибками ${failed.length}`);
-      if (failed.length) console.log(`   Не обработаны: ${failed.join(', ')}`);
+      await scanInputFolder(language);
       return;
     }
 
@@ -298,7 +324,7 @@ async function main() {
       const audioPath = await downloadMedia(input);
       await processFile(audioPath, path.parse(audioPath).name, language);
       if (keepAudio) {
-        console.log(`💾 Аудио сохранено: ${audioPath}`);
+        console.log(`💾 Audio kept: ${audioPath}`);
       } else {
         fs.unlinkSync(audioPath);
       }
@@ -307,14 +333,14 @@ async function main() {
 
     const audioPath = path.isAbsolute(input) ? input : path.join(process.cwd(), input);
     if (!fs.existsSync(audioPath)) {
-      console.error(`❌ Файл не найден: ${audioPath}`);
+      console.error(`❌ File not found: ${audioPath}`);
       process.exit(1);
     }
 
     await processFile(audioPath, path.parse(audioPath).name, language);
 
   } catch (error) {
-    console.error('❌ Ошибка:', error.message);
+    console.error('❌ Error:', error.message);
     process.exit(1);
   }
 }

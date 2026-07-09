@@ -1,57 +1,87 @@
 # Video/Audio Transcriber
 
-Скрипт для транскрибации видео и аудио по ссылке (YouTube и сотни других сайтов) или из локальных файлов через Groq Whisper API.
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Powered by Groq](https://img.shields.io/badge/Whisper-Groq-orange.svg)](https://console.groq.com/)
 
-## Требования
+A small command-line tool that transcribes video and audio into text — from a **URL** (YouTube and hundreds of other sites) or from **local files** — using the [Groq](https://console.groq.com/) Whisper API.
 
-- Node.js
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — для скачивания по ссылке
-- [ffmpeg](https://ffmpeg.org/) (включая `ffprobe`) — для конвертации и нарезки больших файлов
+It handles the tedious parts for you: downloading, converting to audio, compressing oversized files, splitting long recordings into chunks, and stitching everything back into a single clean transcript.
 
-> Скрипт проверяет наличие этих утилит при запуске и подсказывает, чего не хватает.
-> Держите yt-dlp в актуальной версии (`yt-dlp -U` или `winget upgrade yt-dlp`) — устаревшая версия часто перестаёт скачивать с YouTube.
+## Features
 
-## Установка
+- **Any URL.** Anything `yt-dlp` supports — YouTube, Vimeo, X/Twitter, TikTok, and more.
+- **Automatic handling of large files.** Files over 25 MB are compressed with ffmpeg, and recordings that are still too long are automatically split into parts and merged back into one transcript.
+- **Clean formatting.** Text is grouped into paragraphs based on Whisper segments, without breaking on abbreviations or numbers.
+- **Parallel `scan`.** Files in `input/` are processed concurrently (3 at a time by default, see `SCAN_CONCURRENCY`).
+- **Zero-config directories.** `downloads/`, `transcripts/`, and `input/` are created automatically on first run.
 
-1. Установите yt-dlp и ffmpeg:
-```bash
-winget install yt-dlp
-winget install ffmpeg
-```
+## Requirements
 
-2. Установите зависимости:
-```bash
-npm install
-```
+- [Node.js](https://nodejs.org/) 18 or newer
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — for downloading from a URL
+- [ffmpeg](https://ffmpeg.org/) (including `ffprobe`) — for converting and splitting large files
 
-3. Создайте `.env` файл и добавьте API ключ Groq:
-```
-GROQ_API_KEY=gsk_...
-```
+> The script checks for these tools on startup and tells you what's missing.
+> Keep yt-dlp up to date (`yt-dlp -U` or `winget upgrade yt-dlp`) — an outdated version often stops downloading from YouTube.
 
-Получить ключ: https://console.groq.com/keys
+## Installation
 
-## Использование
+1. Install yt-dlp and ffmpeg:
 
-### Интерактивный режим (проще всего)
+   ```bash
+   # Windows
+   winget install yt-dlp
+   winget install ffmpeg
 
-Двойной клик по `start.bat` (Windows) или:
+   # macOS
+   brew install yt-dlp ffmpeg
+
+   # Debian / Ubuntu
+   sudo apt install yt-dlp ffmpeg
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Create a `.env` file (copy from the example) and add your Groq API key:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   ```
+   GROQ_API_KEY=gsk_...
+   ```
+
+   Get a key: https://console.groq.com/keys
+
+## Usage
+
+### Interactive mode (easiest)
+
+Double-click `start.bat` (Windows) or run:
+
 ```bash
 npm start
 ```
-Скрипт спросит ссылку (или путь к файлу) и язык по очереди. Пустая ссылка — обработает папку `input/`.
 
-### Через аргументы
+The script asks for the URL (or file path) and language one at a time. An empty URL processes the `input/` folder.
+
+### With arguments
 
 ```bash
-npm run transcribe <URL> [язык] [--keep]
-npm run transcribe <путь к файлу> [язык]
-npm run transcribe scan [язык]
+npm run transcribe <URL> [language] [--keep]
+npm run transcribe <file path> [language]
+npm run transcribe scan [language]
 ```
 
-Язык по умолчанию: `ru`
+Default language: `ru`
 
-### Примеры
+### Examples
 
 ```bash
 npm run transcribe https://youtube.com/watch?v=... ru
@@ -60,40 +90,57 @@ npm run transcribe ./video.mp4 en
 npm run transcribe scan ru
 ```
 
-### Быстрые команды
+### Shortcuts
 
 ```bash
-npm run scan_ru   # все файлы из input/, язык: ru
-npm run scan_en   # все файлы из input/, язык: en
+npm run scan_ru   # every file in input/, language: ru
+npm run scan_en   # every file in input/, language: en
 ```
 
-## Возможности
+### Example output
 
-- **Любые ссылки.** Поддерживается всё, что умеет yt-dlp — YouTube, Vimeo, X/Twitter, TikTok и другие.
-- **Автообработка больших файлов.** Файлы больше 25 MB сжимаются через ffmpeg, а слишком длинные записи автоматически режутся на части и склеиваются в один транскрипт.
-- **Аккуратное форматирование.** Текст разбивается на абзацы по сегментам Whisper, без разрывов на сокращениях и числах.
-- **Параллельный `scan`.** Файлы из `input/` обрабатываются одновременно (по умолчанию 3, см. `SCAN_CONCURRENCY`).
+```text
+🎤 Transcribing via Groq (language: en)...
+⚠️  File is 41.2 MB (over the 24 MB limit), compressing...
+✅ After compression: 18.4 MB
 
-## Флаги и переменные окружения
+✅ Saved: transcripts/video.txt
 
-| Параметр | Описание |
+Welcome back to the channel. Today we're going to walk through...
+```
+
+## Flags and environment variables
+
+| Option | Description |
 | --- | --- |
-| `--keep` | Не удалять скачанное аудио после транскрибации (остаётся в `downloads/`). |
-| `YT_DLP_BROWSER` | Браузер для cookies, если YouTube требует «Sign in to confirm you're not a bot» (`chrome`, `edge`, `firefox`, `brave`, ...). |
-| `KEEP_AUDIO=true` | То же, что флаг `--keep`. |
-| `SCAN_CONCURRENCY` | Сколько файлов обрабатывать параллельно в режиме `scan` (по умолчанию 3). |
+| `--keep` | Keep the downloaded audio after transcription (stays in `downloads/`). |
+| `YT_DLP_BROWSER` | Browser to read cookies from, if YouTube asks you to "Sign in to confirm you're not a bot" (`chrome`, `edge`, `firefox`, `brave`, ...). |
+| `KEEP_AUDIO=true` | Same as the `--keep` flag. |
+| `SCAN_CONCURRENCY` | How many files to process in parallel in `scan` mode (default 3). |
 
-Пример с cookies из браузера:
+Example with cookies from the browser:
+
 ```bash
-# в .env: YT_DLP_BROWSER=chrome
+# in .env: YT_DLP_BROWSER=chrome
 npm run transcribe https://youtube.com/watch?v=... ru
 ```
 
-## Результат
+## Output
 
-Транскрипты сохраняются в папку `transcripts/` в формате `.txt`.
+Transcripts are saved to the `transcripts/` folder as `.txt` files.
 
-## Поддерживаемые форматы
+## Supported formats
 
-Режим `scan` подхватывает из `input/`: mp4, mp3, wav, m4a, webm.
-По прямому пути к файлу принимается любой формат, который умеет читать ffmpeg (mov, mkv, avi и др.).
+`scan` mode picks up these from `input/`: mp4, mp3, wav, m4a, webm.
+When pointed at a file directly, any format ffmpeg can read is accepted (mov, mkv, avi, and others).
+
+## How it works
+
+1. **Fetch** — download from a URL with yt-dlp, or read a local file.
+2. **Prepare** — if the audio is over the API size limit, compress it to mono 16 kHz; if it's still too big, split it into time-based chunks.
+3. **Transcribe** — send each chunk to Groq's `whisper-large-v3-turbo` model.
+4. **Format** — merge segments into readable paragraphs and save the transcript.
+
+## License
+
+[MIT](LICENSE)
