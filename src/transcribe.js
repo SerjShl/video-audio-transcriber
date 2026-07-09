@@ -7,7 +7,7 @@ import { renderTranscript } from './format.js';
 
 // Shift segment timings by an offset (used when stitching chunks back together
 // so subtitle timestamps stay continuous across the whole recording).
-function offsetSegments(segments, offset) {
+export function offsetSegments(segments, offset) {
   if (!offset) return segments;
   return segments.map(s =>
     Number.isFinite(s.start) && Number.isFinite(s.end)
@@ -26,10 +26,12 @@ export async function transcribe(audioPath, language) {
   }
 
   console.log(`⚠️  File is ${sizeMB(audioPath).toFixed(1)} MB (over the ${MAX_FILE_SIZE_MB} MB limit), compressing...`);
-  const compressedPath = await convertToAudio(audioPath);
-  const cleanup = [compressedPath];
+  // Isolated scratch dir so intermediates never touch input/ and parallel
+  // scan jobs with matching basenames can't collide; removed on the way out.
+  const workDir = fs.mkdtempSync(path.join(DIRS.downloads, 'work-'));
 
   try {
+    const compressedPath = await convertToAudio(audioPath, workDir);
     const compressedMB = sizeMB(compressedPath);
     console.log(`✅ After compression: ${compressedMB.toFixed(1)} MB`);
 
@@ -38,27 +40,33 @@ export async function transcribe(audioPath, language) {
     }
 
     const duration = await getDuration(compressedPath);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      throw new Error('Could not determine audio duration — cannot split the file');
+    }
     const numChunks = Math.ceil(compressedMB / MAX_FILE_SIZE_MB);
     const chunkSeconds = Math.ceil(duration / numChunks);
     console.log(`✂️  Long recording (${Math.round(duration / 60)} min) — splitting into ${numChunks} parts of ~${Math.round(chunkSeconds / 60)} min`);
 
     const chunks = await splitAudio(compressedPath, chunkSeconds);
-    cleanup.push(...chunks);
-
-    const realChunks = chunks.filter(f => fs.statSync(f).size > MIN_CHUNK_BYTES);
+    const realCount = chunks.filter(f => fs.statSync(f).size > MIN_CHUNK_BYTES).length;
 
     const segments = [];
     let offset = 0;
-    for (let i = 0; i < realChunks.length; i++) {
-      console.log(`   🎤 Part ${i + 1}/${realChunks.length}...`);
-      const chunkDuration = await getDuration(realChunks[i]);
-      const chunkSegments = await transcribeChunk(realChunks[i], language);
-      segments.push(...offsetSegments(chunkSegments, offset));
-      offset += chunkDuration;
+    let part = 0;
+    // Accumulate the offset over EVERY chunk (even skipped near-empty ones) so
+    // subtitle timestamps stay aligned to the original timeline.
+    for (const chunk of chunks) {
+      const chunkDuration = await getDuration(chunk);
+      if (fs.statSync(chunk).size > MIN_CHUNK_BYTES) {
+        console.log(`   🎤 Part ${++part}/${realCount}...`);
+        const chunkSegments = await transcribeChunk(chunk, language);
+        segments.push(...offsetSegments(chunkSegments, offset));
+      }
+      if (Number.isFinite(chunkDuration)) offset += chunkDuration;
     }
     return segments;
   } finally {
-    cleanup.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
+    fs.rmSync(workDir, { recursive: true, force: true });
   }
 }
 

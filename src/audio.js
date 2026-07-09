@@ -18,10 +18,13 @@ export async function getDuration(filePath) {
 }
 
 // Extract a compact mono audio track suitable for the Whisper API.
-export async function convertToAudio(inputPath) {
+// Writes into outputDir (defaults next to the source) — callers pass an
+// isolated working directory so intermediates never land in input/.
+export async function convertToAudio(inputPath, outputDir) {
   console.log('🔄 Converting to audio...');
   const parsed = path.parse(inputPath);
-  const outputPath = path.join(parsed.dir, `${parsed.name}_converted.mp3`);
+  const dir = outputDir || parsed.dir;
+  const outputPath = path.join(dir, `${parsed.name}_converted.mp3`);
 
   try {
     await execa('ffmpeg', [
