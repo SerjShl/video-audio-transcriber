@@ -1,0 +1,53 @@
+{
+  "name": "video-audio-transcriber",
+  "version": "1.0.0",
+  "description": "Transcribe videos from a URL (YouTube and hundreds of other sites) or local audio/video files using the Groq Whisper API",
+  "main": "transcribe.js",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node transcribe.js --interactive",
+    "transcribe": "node transcribe.js",
+    "scan": "node transcribe.js scan",
+    "scan_ru": "node transcribe.js scan ru",
+    "scan_en": "node transcribe.js scan en",
+    "test": "node --test",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "transcription",
+    "transcribe",
+    "whisper",
+    "groq",
+    "youtube",
+    "yt-dlp",
+    "ffmpeg",
+    "audio",
+    "video",
+    "speech-to-text",
+    "subtitles",
+    "cli"
+  ],
+  "author": "SerjShl",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SerjShl/video-audio-transcriber.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SerjShl/video-audio-transcriber/issues"
+  },
+  "homepage": "https://github.com/SerjShl/video-audio-transcriber#readme",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "execa": "^9.5.2",
+    "groq-sdk": "^0.37.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0"
+  }
+}
