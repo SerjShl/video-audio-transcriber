@@ -12,7 +12,9 @@
     "transcribe": "node transcribe.js",
     "scan": "node transcribe.js scan",
     "scan_ru": "node transcribe.js scan ru",
-    "scan_en": "node transcribe.js scan en"
+    "scan_en": "node transcribe.js scan en",
+    "test": "node --test",
+    "lint": "eslint ."
   },
   "keywords": [
     "transcription",
@@ -42,5 +44,10 @@
     "dotenv": "^16.4.5",
     "execa": "^9.5.2",
     "groq-sdk": "^0.37.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0"
   }
 }
