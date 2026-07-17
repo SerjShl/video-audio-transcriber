@@ -9,8 +9,12 @@ export async function downloadMedia(url) {
 
   const args = ['-x', '--audio-format', 'mp3', '-o', outputPath];
 
+  const cookiesFile = process.env.YT_DLP_COOKIES;
   const browser = process.env.YT_DLP_BROWSER;
-  if (browser) {
+  if (cookiesFile) {
+    console.log(`🍪 Using cookies file: ${cookiesFile}`);
+    args.push('--cookies', cookiesFile);
+  } else if (browser) {
     console.log(`🍪 Using cookies from browser: ${browser}`);
     args.push('--cookies-from-browser', browser);
   }

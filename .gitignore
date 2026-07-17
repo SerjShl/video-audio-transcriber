@@ -1,5 +1,6 @@
 node_modules/
 .env
+cookies.txt
 downloads/
 transcripts/
 input/*.mp4

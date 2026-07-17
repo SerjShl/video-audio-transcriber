@@ -139,6 +139,7 @@ Welcome back to the channel. Today we're going to walk through...
 | `-i, --interactive` | Prompt for the URL and language step by step. |
 | `-h, --help` | Show usage. |
 | `YT_DLP_BROWSER` | Browser to read cookies from, if YouTube asks you to "Sign in to confirm you're not a bot" (`chrome`, `edge`, `firefox`, `brave`, ...). |
+| `YT_DLP_COOKIES` | Path to a Netscape-format `cookies.txt` file. Takes precedence over `YT_DLP_BROWSER`. The more reliable option when reading cookies straight from the browser fails. |
 | `KEEP_AUDIO=true` | Same as the `--keep` flag. |
 | `SCAN_CONCURRENCY` | How many files to process in parallel in `scan` mode (default 3). |
 | `WHISPER_MODEL` | Groq Whisper model to use (default `whisper-large-v3-turbo`). |
@@ -149,6 +150,24 @@ Example with cookies from the browser:
 # in .env: YT_DLP_BROWSER=chrome
 npm run transcribe https://youtube.com/watch?v=... ru
 ```
+
+If reading cookies from the browser keeps failing (YouTube rotates cookies in
+open tabs), export them to a file instead — this is what yt-dlp officially
+recommends:
+
+1. Install a "cookies.txt" browser extension (e.g. *Get cookies.txt LOCALLY*).
+2. Open YouTube, then navigate to `https://www.youtube.com/robots.txt` in the
+   same tab.
+3. Export the `youtube.com` cookies (Netscape format) to `cookies.txt`.
+4. **Close the browser** right after, so the session stops rotating.
+
+```bash
+# in .env: YT_DLP_COOKIES=./cookies.txt
+npm run transcribe https://youtube.com/watch?v=... ru
+```
+
+> `cookies.txt` grants access to your YouTube account — it is git-ignored, keep
+> it out of version control.
 
 ## Output
 
