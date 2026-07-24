@@ -11,9 +11,16 @@ export const DIRS = {
   input: path.join(ROOT, 'input')
 };
 
+// Transcription engine: 'groq' (cloud API) or 'local' (offline whisper.cpp).
+export const DEFAULT_ENGINE = process.env.TRANSCRIBER_ENGINE || 'groq';
+
 // Groq caps uploads at 25 MB; stay just under to leave headroom.
 export const MAX_FILE_SIZE_MB = 24;
 export const WHISPER_MODEL = process.env.WHISPER_MODEL || 'whisper-large-v3-turbo';
+
+// Local engine (whisper.cpp). WHISPER_CPP_MODEL must point at a ggml model file.
+export const WHISPER_CPP_BIN = process.env.WHISPER_CPP_BIN || 'whisper-cli';
+export const WHISPER_CPP_MODEL = process.env.WHISPER_CPP_MODEL || '';
 export const PARAGRAPH_MIN_CHARS = 280;
 export const MIN_CHUNK_BYTES = 2048;
 export const AUDIO_SAMPLE_RATE = '16000';

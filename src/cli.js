@@ -6,6 +6,7 @@ import {
   DIRS,
   ensureDirs,
   DEFAULT_LANGUAGE,
+  DEFAULT_ENGINE,
   SCAN_CONCURRENCY,
   SCAN_EXTENSIONS,
   OUTPUT_FORMATS
@@ -13,6 +14,7 @@ import {
 import { ensureCommand } from './deps.js';
 import { downloadMedia } from './download.js';
 import { processFile } from './transcribe.js';
+import { getEngine } from './engines/index.js';
 import { runPool } from './pool.js';
 
 dotenv.config();
@@ -25,7 +27,8 @@ export function parseArgs(argv) {
     interactive: false,
     help: false,
     format: 'txt',
-    out: null
+    out: null,
+    engine: DEFAULT_ENGINE
   };
   const positionals = [];
 
@@ -38,6 +41,8 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--format=')) opts.format = arg.slice('--format='.length);
     else if (arg === '-o' || arg === '--out') opts.out = argv[++i];
     else if (arg.startsWith('--out=')) opts.out = arg.slice('--out='.length);
+    else if (arg === '-e' || arg === '--engine') opts.engine = argv[++i];
+    else if (arg.startsWith('--engine=')) opts.engine = arg.slice('--engine='.length);
     else if (!arg.startsWith('-')) positionals.push(arg);
   }
 
@@ -59,6 +64,7 @@ function printUsage() {
   console.log('\nOptions:');
   console.log('  -f, --format <fmt>  output format: txt (default), srt, vtt');
   console.log('  -o, --out <dir>     output directory (default: transcripts/)');
+  console.log('  -e, --engine <name> transcription engine: groq (default, cloud) or local (offline)');
   console.log('      --keep          keep the downloaded audio after transcription');
   console.log('  -i, --interactive   prompt for the URL and language step by step');
   console.log('  -h, --help          show this help\n');
@@ -76,13 +82,13 @@ async function askInteractive() {
   }
 }
 
-async function scanInputFolder({ language, format, outputDir }) {
+async function scanInputFolder({ language, format, outputDir, engine }) {
   const files = fs.readdirSync(DIRS.input).filter(f => SCAN_EXTENSIONS.test(f));
 
   console.log(`▶️  Files: ${files.length}, concurrency: ${SCAN_CONCURRENCY}`);
   const results = await runPool(files, SCAN_CONCURRENCY, async (file) => {
     try {
-      await processFile(path.join(DIRS.input, file), path.parse(file).name, { language, format, outputDir });
+      await processFile(path.join(DIRS.input, file), path.parse(file).name, { language, format, outputDir, engine });
       console.log(`✅ ${file}`);
       return { file, ok: true };
     } catch (error) {
@@ -118,9 +124,12 @@ export async function run(argv = process.argv.slice(2)) {
     process.exit(1);
   }
 
-  if (!process.env.GROQ_API_KEY) {
-    console.error('❌ Add GROQ_API_KEY to your .env file');
-    console.error('   Get a key: https://console.groq.com/keys');
+  let engine;
+  try {
+    engine = getEngine(options.engine);
+    await engine.ensureReady();
+  } catch (error) {
+    console.error(`❌ ${error.message}`);
     process.exit(1);
   }
 
@@ -138,14 +147,14 @@ export async function run(argv = process.argv.slice(2)) {
     }
 
     if (input === 'scan') {
-      await scanInputFolder({ language, format, outputDir });
+      await scanInputFolder({ language, format, outputDir, engine });
       return;
     }
 
     if (isUrl) {
       const audioPath = await downloadMedia(input);
       try {
-        await processFile(audioPath, path.parse(audioPath).name, { language, format, outputDir });
+        await processFile(audioPath, path.parse(audioPath).name, { language, format, outputDir, engine });
       } finally {
         if (keep) {
           console.log(`💾 Audio kept: ${audioPath}`);
@@ -162,7 +171,7 @@ export async function run(argv = process.argv.slice(2)) {
       process.exit(1);
     }
 
-    await processFile(audioPath, path.parse(audioPath).name, { language, format, outputDir });
+    await processFile(audioPath, path.parse(audioPath).name, { language, format, outputDir, engine });
   } catch (error) {
     console.error('❌ Error:', error.message);
     process.exit(1);

@@ -42,6 +42,29 @@ export async function convertToAudio(inputPath, outputDir) {
   }
 }
 
+// Extract a 16 kHz mono PCM WAV — the format the local whisper.cpp engine
+// expects. Written into outputDir (an isolated scratch dir passed by callers).
+export async function convertToWav(inputPath, outputDir) {
+  const parsed = path.parse(inputPath);
+  const dir = outputDir || parsed.dir;
+  const outputPath = path.join(dir, `${parsed.name}_16k.wav`);
+
+  try {
+    await execa('ffmpeg', [
+      '-i', inputPath,
+      '-vn',
+      '-ar', AUDIO_SAMPLE_RATE,
+      '-ac', AUDIO_CHANNELS,
+      '-c:a', 'pcm_s16le',
+      '-y',
+      outputPath
+    ]);
+    return outputPath;
+  } catch (error) {
+    throw new Error(`Conversion failed: ${error.message}`);
+  }
+}
+
 // Split an audio file into fixed-length chunks and return their paths in order.
 export async function splitAudio(inputPath, chunkSeconds) {
   const parsed = path.parse(inputPath);
