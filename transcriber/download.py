@@ -28,7 +28,10 @@ def download_media(url) -> Path:
     paths = list(dict.fromkeys(line.strip() for line in result.stdout.splitlines() if line.strip()))
 
     if len(paths) > 1:
-        print(f"⚠️  {len(paths)} items downloaded (looks like a playlist) — transcribing only the last one.")
+        print(
+            f"⚠️  {len(paths)} items downloaded (looks like a playlist) — "
+            "transcribing only the last one."
+        )
 
     if not paths:
         raise RuntimeError("Could not determine the path of the downloaded file")

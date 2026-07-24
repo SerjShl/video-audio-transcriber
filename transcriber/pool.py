@@ -46,7 +46,7 @@ def with_retry(fn, retries=3, base_ms=1000, on_retry=None):
     while True:
         try:
             return fn()
-        except Exception as error:  # noqa: BLE001 — re-raised unless retryable
+        except Exception as error:
             if attempt >= retries or not is_retryable(error):
                 raise
             delay_ms = base_ms * (2 ** attempt)

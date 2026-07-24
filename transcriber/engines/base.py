@@ -21,6 +21,7 @@ class Engine(ABC):
 
     def ensure_ready(self) -> None:
         """Raise a user-facing error if the engine can't run. No-op by default."""
+        return None
 
     @abstractmethod
     def transcribe_chunk(self, audio_path, language) -> list[dict]:

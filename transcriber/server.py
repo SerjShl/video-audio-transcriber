@@ -126,7 +126,7 @@ async def _run_job(job, params):
             job.result = await loop.run_in_executor(None, work)
             job.status = "done"
             _emit(job, {"type": "done", "result": job.result}, loop)
-        except Exception as error:  # noqa: BLE001 — surfaced to the client
+        except Exception as error:
             job.status = "error"
             _emit(job, {"type": "error", "message": str(error)}, loop)
 
@@ -166,7 +166,10 @@ def create_app():
         if url:
             if not _URL_RE.match(url):
                 raise HTTPException(400, "A valid http(s) URL is required")
-            params = {"source": "url", "url": url, "language": language, "format": fmt, "engine": engine}
+            params = {
+                "source": "url", "url": url,
+                "language": language, "format": fmt, "engine": engine,
+            }
         elif file is not None:
             DIRS["downloads"].mkdir(parents=True, exist_ok=True)
             work_dir = Path(tempfile.mkdtemp(prefix="upload-", dir=DIRS["downloads"]))

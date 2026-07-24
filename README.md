@@ -1,217 +1,167 @@
 # Video/Audio Transcriber
 
 [![CI](https://github.com/SerjShl/video-audio-transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/SerjShl/video-audio-transcriber/actions/workflows/ci.yml)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-%3E%3D3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Powered by Groq](https://img.shields.io/badge/Whisper-Groq-orange.svg)](https://console.groq.com/)
 
-A small command-line tool that transcribes video and audio into text — from a **URL** (YouTube and hundreds of other sites) or from **local files** — using the [Groq](https://console.groq.com/) Whisper API.
+Transcribe video and audio into text — from a **URL** (YouTube and hundreds of
+other sites) or from **local files** — either in the **cloud** via the
+[Groq](https://console.groq.com/) Whisper API or **fully offline** via
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 
-It handles the tedious parts for you: downloading, converting to audio, compressing oversized files, splitting long recordings into chunks, and stitching everything back into a single clean transcript.
+Use it from the **command line** or from a small **web UI** (drag-and-drop a
+file or paste a link). It handles the tedious parts: downloading, converting to
+audio, compressing oversized files, splitting long recordings into chunks, and
+stitching everything back into a single clean transcript.
 
-## Features
+## Two engines
 
-- **Any URL.** Anything `yt-dlp` supports — YouTube, Vimeo, X/Twitter, TikTok, and more.
-- **Multiple output formats.** Plain text, or timestamped subtitles (`--format srt` / `--format vtt`).
-- **Automatic handling of large files.** Files over 25 MB are compressed with ffmpeg, and recordings that are still too long are automatically split into parts and merged back into one transcript (with continuous subtitle timestamps).
-- **Resilient API calls.** Transient failures and rate limits are retried with exponential backoff.
-- **Clean formatting.** Text is grouped into paragraphs based on Whisper segments, without breaking on abbreviations or numbers.
-- **Parallel `scan`.** Files in `input/` are processed concurrently (3 at a time by default, see `SCAN_CONCURRENCY`).
-- **Zero-config directories.** `downloads/`, `transcripts/`, and `input/` are created automatically on first run.
+| | `groq` (default) | `local` |
+| --- | --- | --- |
+| Where | Cloud API | Your machine, offline |
+| Needs | `GROQ_API_KEY` (free) | `pip install ".[local]"`, ~1 GB model |
+| Privacy | Audio uploaded | Nothing leaves your machine |
+| Size limit | 25 MB (auto compress/split) | None |
+| Speed | Very fast | Depends on CPU/GPU; model loads once and is reused |
+
+Pick per run with `--engine`, or set a default with `TRANSCRIBER_ENGINE`.
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) 18 or newer
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — for downloading from a URL
-- [ffmpeg](https://ffmpeg.org/) (including `ffprobe`) — for converting and splitting large files
+- [Python](https://www.python.org/) 3.10 or newer
+- [ffmpeg](https://ffmpeg.org/) (including `ffprobe`) — convert/split audio
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — only needed for URLs
+- For the `local` engine: optionally an NVIDIA GPU (CUDA) for a big speed-up
 
-> The script checks for these tools on startup and tells you what's missing.
-> Keep yt-dlp up to date (`yt-dlp -U` or `winget upgrade yt-dlp`) — an outdated version often stops downloading from YouTube.
+> The tool checks for these on startup and tells you what's missing.
+> Keep yt-dlp up to date (`yt-dlp -U`) — an outdated version often stops
+> downloading from YouTube.
 
 ## Installation
 
-1. Install yt-dlp and ffmpeg:
-
-   ```bash
-   # Windows
-   winget install yt-dlp
-   winget install ffmpeg
-
-   # macOS
-   brew install yt-dlp ffmpeg
-
-   # Debian / Ubuntu
-   sudo apt install yt-dlp ffmpeg
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Create a `.env` file (copy from the example) and add your Groq API key:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   ```
-   GROQ_API_KEY=gsk_...
-   ```
-
-   Get a key: https://console.groq.com/keys
-
-## Usage
-
-### Interactive mode (easiest)
-
-Double-click `start.bat` (Windows) or run:
-
-### Интерактивный режим (проще всего)
-
-Двойной клик по `start.bat` (Windows) или:
 ```bash
-npm start
-```
-Скрипт спросит ссылку (или путь к файлу) и язык по очереди. Пустая ссылка — обработает папку `input/`.
+# system tools
+brew install ffmpeg yt-dlp          # macOS
+# sudo apt install ffmpeg yt-dlp    # Debian/Ubuntu
+# winget install ffmpeg yt-dlp      # Windows
 
-### Через аргументы
+# the transcriber (cloud engine only)
+pip install .
 
-```bash
-npm start
+# with the offline engine and/or the web server
+pip install ".[local]"              # offline faster-whisper
+pip install ".[server]"             # web UI backend
+pip install ".[local,server,dev]"   # everything + test tools
 ```
 
-The script asks for the URL (or file path) and language one at a time. An empty URL processes the `input/` folder.
-
-### With arguments
+Then copy the env template and add your Groq key (for the cloud engine):
 
 ```bash
-npm run transcribe <URL> [language] [options]
-npm run transcribe <file path> [language] [options]
-npm run transcribe scan [language] [options]
+cp .env.example .env
+# GROQ_API_KEY=gsk_...   → https://console.groq.com/keys
 ```
 
-Default language: `ru`. Run `node transcribe.js --help` for the full list of options.
+## Command-line usage
+
+```bash
+transcribe <URL> [language] [options]
+transcribe <file path> [language] [options]
+transcribe scan [language] [options]     # every file in input/
+transcribe --interactive                 # prompt step by step
+```
+
+Default language is `ru`. Run `transcribe --help` for the full list.
 
 ### Examples
 
 ```bash
-npm run transcribe https://youtube.com/watch?v=... ru
-npm run transcribe https://vimeo.com/... en
-npm run transcribe ./video.mp4 en
-npm run transcribe scan ru
-
-# Subtitles instead of plain text
-npm run transcribe ./video.mp4 en --format srt
-npm run transcribe https://youtube.com/watch?v=... ru --format vtt
-
-# Custom output directory
-npm run transcribe scan en --out ./subtitles
+transcribe https://youtube.com/watch?v=... ru
+transcribe ./talk.mp4 en --format srt
+transcribe ./talk.mp4 en --format json          # segment-level JSON
+transcribe scan ru --out ./subs
+transcribe ./private.mp4 ru --engine local      # offline, nothing uploaded
 ```
 
-### Shortcuts
+`start.sh` / `start.bat` launch interactive mode with a double-click.
+
+## Web UI
+
+A modern UI (Vite + React + [shadcn/ui](https://ui.shadcn.com)) that talks to a
+FastAPI backend, with live progress and copy/download of the result.
 
 ```bash
-npm run scan_ru   # every file in input/, language: ru
-npm run scan_en   # every file in input/, language: en
+# 1. build the frontend once
+cd frontend && npm install && npm run build && cd ..
+
+# 2. run the server (serves the built UI + API)
+transcriber-server        # or: python -m transcriber.server  ·  or web.sh / web.bat
+# → http://127.0.0.1:8000
 ```
 
-### Example output
-
-```text
-🎤 Transcribing via Groq (language: en)...
-⚠️  File is 41.2 MB (over the 24 MB limit), compressing...
-✅ After compression: 18.4 MB
-
-✅ Saved: transcripts/video.txt
-
-Welcome back to the channel. Today we're going to walk through...
-```
+For frontend development with hot reload, run the backend and `npm run dev` in
+`frontend/` (it proxies `/api` to the backend). See `frontend/README.md`.
 
 ## Flags and environment variables
 
 | Option | Description |
 | --- | --- |
-| `-f, --format <fmt>` | Output format: `txt` (default), `srt`, or `vtt`. |
+| `-f, --format <fmt>` | `txt` (default), `srt`, `vtt`, or `json`. |
 | `-o, --out <dir>` | Output directory (default: `transcripts/`). |
-| `--keep` | Keep the downloaded audio after transcription (stays in `downloads/`). |
+| `-e, --engine <name>` | `groq` (cloud, default) or `local` (offline). |
+| `--keep` | Keep the downloaded audio (stays in `downloads/`). |
 | `-i, --interactive` | Prompt for the URL and language step by step. |
-| `-h, --help` | Show usage. |
-| `YT_DLP_BROWSER` | Browser to read cookies from, if YouTube asks you to "Sign in to confirm you're not a bot" (`chrome`, `edge`, `firefox`, `brave`, ...). |
-| `YT_DLP_COOKIES` | Path to a Netscape-format `cookies.txt` file. Takes precedence over `YT_DLP_BROWSER`. The more reliable option when reading cookies straight from the browser fails. |
-| `KEEP_AUDIO=true` | Same as the `--keep` flag. |
-| `SCAN_CONCURRENCY` | How many files to process in parallel in `scan` mode (default 3). |
-| `WHISPER_MODEL` | Groq Whisper model to use (default `whisper-large-v3-turbo`). |
-
-Example with cookies from the browser:
-
-```bash
-# in .env: YT_DLP_BROWSER=chrome
-npm run transcribe https://youtube.com/watch?v=... ru
-```
-
-If reading cookies from the browser keeps failing (YouTube rotates cookies in
-open tabs), export them to a file instead — this is what yt-dlp officially
-recommends:
-
-1. Install a "cookies.txt" browser extension (e.g. *Get cookies.txt LOCALLY*).
-2. Open YouTube, then navigate to `https://www.youtube.com/robots.txt` in the
-   same tab.
-3. Export the `youtube.com` cookies (Netscape format) to `cookies.txt`.
-4. **Close the browser** right after, so the session stops rotating.
-
-```bash
-# in .env: YT_DLP_COOKIES=./cookies.txt
-npm run transcribe https://youtube.com/watch?v=... ru
-```
-
-> `cookies.txt` grants access to your YouTube account — it is git-ignored, keep
-> it out of version control.
-
-## Output
-
-Transcripts are saved to the `transcripts/` folder as `.txt` files.
-
-## Supported formats
-
-`scan` mode picks up these from `input/`: mp4, mp3, wav, m4a, webm.
-When pointed at a file directly, any format ffmpeg can read is accepted (mov, mkv, avi, and others).
+| `TRANSCRIBER_ENGINE` | Default engine when `--engine` is omitted. |
+| `GROQ_API_KEY` | Groq API key (cloud engine). |
+| `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
+| `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3`). |
+| `WHISPER_DEVICE` | `auto` / `cpu` / `cuda` for the local engine. |
+| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot". |
+| `SCAN_CONCURRENCY` | Parallel files in `scan` mode (default 3). |
+| `PORT` | Web server port (default 8000). |
 
 ## How it works
 
 1. **Fetch** — download from a URL with yt-dlp, or read a local file.
-2. **Prepare** — if the audio is over the API size limit, compress it to mono 16 kHz; if it's still too big, split it into time-based chunks.
-3. **Transcribe** — send each chunk to Groq's `whisper-large-v3-turbo` model, retrying transient failures.
-4. **Format** — merge segments into readable paragraphs (or timestamped subtitle cues) and save the transcript.
+2. **Prepare** — for the cloud engine, if the audio is over the API size limit,
+   compress it to mono 16 kHz and, if still too big, split it into time-based
+   chunks. The local engine has no size limit and skips this.
+3. **Transcribe** — send each chunk to the selected engine, retrying transient
+   failures (cloud) with exponential backoff.
+4. **Format** — merge segments into readable paragraphs, subtitle cues, or JSON,
+   and save the transcript to `transcripts/`.
 
 ## Project structure
 
 ```
-transcribe.js        # CLI entry point
-src/
-  cli.js             # argument parsing, interactive mode, command dispatch
-  config.js          # constants and directory setup
-  deps.js            # external command checks (ffmpeg, yt-dlp)
-  download.js        # media download via yt-dlp
-  audio.js           # ffmpeg/ffprobe: convert, probe, split
-  groq.js            # Groq Whisper API call with retry
-  transcribe.js      # orchestration: compress → split → transcribe → stitch
-  format.js          # txt / srt / vtt rendering
-  pool.js            # concurrency pool and retry/backoff helpers
-test/                # node:test unit tests
+transcriber/            # Python package
+  config.py             # constants and directory setup
+  cli.py                # argument parsing, interactive mode, dispatch
+  server.py             # FastAPI backend with SSE progress
+  deps.py               # external command checks (ffmpeg, yt-dlp)
+  download.py           # media download via yt-dlp
+  audio.py              # ffmpeg/ffprobe: probe, convert, split
+  pipeline.py           # orchestration: compress → split → transcribe → stitch
+  formatting.py         # txt / srt / vtt / json rendering
+  pool.py               # concurrency pool and retry/backoff
+  engines/              # groq (cloud) and local (faster-whisper)
+frontend/               # Vite + React + shadcn/ui web UI
+tests/                  # pytest suite (no external services needed)
 ```
 
 ## Development
 
 ```bash
-npm test    # run the unit tests (node:test, no external services needed)
-npm run lint  # run ESLint
+pip install ".[server,dev]"
+ruff check .            # lint
+pytest -q               # unit tests
+
+cd frontend && npm run build   # type-check + build the UI
 ```
 
-Tests cover the pure logic — paragraph formatting, subtitle rendering, the
-concurrency pool, retry/backoff, and argument parsing — so they run without
-ffmpeg, yt-dlp, or a Groq key. CI runs lint + tests on Node 18/20/22.
+Tests cover the pure logic — paragraph formatting, subtitle/JSON rendering, the
+concurrency pool, retry/backoff, argument parsing, engine resolution, segment
+stitching, and a full server job run — so they need no ffmpeg, yt-dlp, or API
+key. CI runs lint + tests on Python 3.10/3.11/3.12 and builds the frontend.
 
 ## License
 

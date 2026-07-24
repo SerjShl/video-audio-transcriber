@@ -33,9 +33,13 @@ def build_parser():
         "audio/video files, in the cloud (Groq) or fully offline (faster-whisper).",
     )
     parser.add_argument("input", nargs="?", help="URL, file path, or 'scan' for the input/ folder")
-    parser.add_argument("language", nargs="?", default=DEFAULT_LANGUAGE, help="language code (default: ru)")
+    parser.add_argument(
+        "language", nargs="?", default=DEFAULT_LANGUAGE, help="language code (default: ru)"
+    )
     parser.add_argument("-f", "--format", default="txt", help="output format: txt, srt, vtt, json")
-    parser.add_argument("-o", "--out", default=None, help="output directory (default: transcripts/)")
+    parser.add_argument(
+        "-o", "--out", default=None, help="output directory (default: transcripts/)"
+    )
     parser.add_argument(
         "-e", "--engine", default=DEFAULT_ENGINE, help="engine: groq (cloud) or local (offline)"
     )
@@ -71,10 +75,12 @@ def _scan(language, fmt, output_dir, engine):
 
     def worker(path, _index):
         try:
-            process_file(path, path.stem, language=language, fmt=fmt, output_dir=output_dir, engine=engine)
+            process_file(
+                path, path.stem, language=language, fmt=fmt, output_dir=output_dir, engine=engine
+            )
             print(f"✅ {path.name}")
             return (path.name, True)
-        except Exception as error:  # noqa: BLE001 — one bad file shouldn't stop the batch
+        except Exception as error:
             print(f"❌ Skipped {path.name}: {error}")
             return (path.name, False)
 
@@ -100,7 +106,9 @@ def run(argv=None):
         return 0
 
     if fmt not in OUTPUT_FORMATS:
-        print(f'❌ Unknown format "{fmt}". Use one of: {", ".join(OUTPUT_FORMATS)}', file=sys.stderr)
+        print(
+            f'❌ Unknown format "{fmt}". Use one of: {", ".join(OUTPUT_FORMATS)}', file=sys.stderr
+        )
         return 1
 
     try:
@@ -149,7 +157,7 @@ def run(argv=None):
             language=language, fmt=fmt, output_dir=output_dir, engine=engine,
         )
         return 0
-    except Exception as error:  # noqa: BLE001 — top-level guard prints a friendly message
+    except Exception as error:
         print(f"❌ Error: {error}", file=sys.stderr)
         return 1
 
