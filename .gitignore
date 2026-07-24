@@ -13,3 +13,19 @@ input/*.mov
 input/*.mkv
 *-player-script.js
 .idea/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+models/
+
+# Frontend build output
+frontend/dist/
+frontend/node_modules/
