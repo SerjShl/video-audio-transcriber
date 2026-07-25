@@ -8,6 +8,12 @@ import json
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load .env before reading any variables below, so settings like WHISPER_DEVICE
+# actually take effect (config is imported before callers call load_dotenv).
+load_dotenv()
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # All runtime folders live under a single data/ dir to keep the repo root tidy.
@@ -51,7 +57,9 @@ WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "whisper-large-v3-turbo")
 # Local engine (faster-whisper). The model is downloaded once and cached; after
 # that the engine runs fully offline and reuses the loaded model across files.
 LOCAL_MODEL = os.environ.get("WHISPER_LOCAL_MODEL", "large-v3")
-LOCAL_DEVICE = os.environ.get("WHISPER_DEVICE", "auto")  # auto | cpu | cuda
+# Default to CPU: it works everywhere. Set WHISPER_DEVICE=cuda (or auto) only if
+# you have a working CUDA runtime — otherwise CTranslate2 fails on cublas DLLs.
+LOCAL_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")  # cpu | cuda | auto
 LOCAL_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "default")
 
 PARAGRAPH_MIN_CHARS = 280

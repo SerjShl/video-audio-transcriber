@@ -227,9 +227,11 @@ export const STRINGS: Record<UiLang, Strings> = {
   },
 };
 
+export const UI_LANG_KEY = "vat_ui_lang_v2";
+
 export function getInitialUiLang(): UiLang {
   try {
-    const saved = localStorage.getItem("vat_ui_lang");
+    const saved = localStorage.getItem(UI_LANG_KEY);
     if (saved === "ru" || saved === "en") return saved;
   } catch {
     /* ignore */

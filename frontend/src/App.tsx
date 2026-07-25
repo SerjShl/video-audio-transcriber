@@ -46,7 +46,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { STRINGS, UI_LANGS, type UiLang, getInitialUiLang } from "@/i18n";
+import { STRINGS, UI_LANGS, UI_LANG_KEY, type UiLang, getInitialUiLang } from "@/i18n";
 
 type Status = "idle" | "running" | "done" | "error";
 type Result = { text: string; filename: string; format: string };
@@ -156,7 +156,7 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = uiLang;
     try {
-      localStorage.setItem("vat_ui_lang", uiLang);
+      localStorage.setItem(UI_LANG_KEY, uiLang);
     } catch {
       /* ignore */
     }
