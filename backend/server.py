@@ -24,8 +24,8 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
+from . import config
 from .config import (
-    DATA_DIR,
     DEFAULT_LANGUAGE,
     DIRS,
     MAX_UPLOAD_MB,
@@ -35,7 +35,13 @@ from .config import (
 )
 from .deps import ensure_command
 from .download import download_media
-from .engines import ENGINE_NAMES, engine_availability, get_engine, resolve_default_engine
+from .engines import (
+    ENGINE_NAMES,
+    engine_availability,
+    get_engine,
+    reset_engine,
+    resolve_default_engine,
+)
 from .formatting import render_output
 from .pipeline import transcribe
 
@@ -43,9 +49,8 @@ load_dotenv()
 
 _URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 
-# --- session auth + runtime settings ----------------------------------------
+# --- session auth (dormant unless APP_PASSWORD is set) ----------------------
 SESSION_COOKIE = "vat_session"
-_SETTINGS_PATH = DATA_DIR / "settings.json"
 
 
 def _app_password():
@@ -56,39 +61,20 @@ def password_configured():
     return bool(_app_password())
 
 
-def _load_settings():
-    try:
-        return json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
-def _save_settings(settings):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _SETTINGS_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-
-
 def _stored_cookies_path():
-    """A single shared cookies.txt for yt-dlp, managed via Settings.
-
-    One person uploads it once; every URL job reuses it, so non-technical users
-    never touch cookies. It lives under data/ and is never served back out.
-    """
-    return DATA_DIR / "cookies.txt"
+    """The single shared cookies.txt for yt-dlp, managed in Settings."""
+    return config.COOKIES_PATH
 
 
 def _cookies_meta():
     if _stored_cookies_path().exists():
-        return {"present": True, "name": _load_settings().get("cookies_name") or "cookies.txt"}
+        name = config.load_settings().get("cookies_name") or "cookies.txt"
+        return {"present": True, "name": name}
     return {"present": False, "name": None}
 
 
 def auth_required():
-    """Whether the web UI gates access behind the password.
-
-    Governed solely by whether APP_PASSWORD is configured on the server — one
-    place, survives restarts, and can't silently turn off on an ephemeral disk.
-    """
+    """Login is required only when APP_PASSWORD is set (off for local use)."""
     return password_configured()
 
 
@@ -364,6 +350,7 @@ def create_app():
         return {
             "authRequired": auth_required(),
             "passwordConfigured": password_configured(),
+            "groqKeySet": bool(config.groq_api_key()),
             "cookies": _cookies_meta(),
         }
 
@@ -371,13 +358,29 @@ def create_app():
     def get_settings():
         return _settings_payload()
 
+    @app.post("/api/groq-key")
+    async def set_groq_key(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            body = dict(await request.form())
+        key = str(body.get("key", "")).strip()
+        settings = config.load_settings()
+        if key:
+            settings["groq_api_key"] = key
+        else:
+            settings.pop("groq_api_key", None)
+        config.save_settings(settings)
+        reset_engine("groq")  # rebuild the client with the new key
+        return _settings_payload()
+
     @app.post("/api/cookies")
     async def upload_cookies(cookies: UploadFile = File(...)):
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        config.COOKIES_PATH.parent.mkdir(parents=True, exist_ok=True)
         await _stream_to(cookies, _stored_cookies_path(), max_bytes=5 * 1024 * 1024)
-        settings = _load_settings()
+        settings = config.load_settings()
         settings["cookies_name"] = safe_basename(cookies.filename, "cookies.txt")
-        _save_settings(settings)
+        config.save_settings(settings)
         return _settings_payload()
 
     @app.delete("/api/cookies")
@@ -385,9 +388,9 @@ def create_app():
         path = _stored_cookies_path()
         if path.exists():
             path.unlink()
-        settings = _load_settings()
+        settings = config.load_settings()
         settings.pop("cookies_name", None)
-        _save_settings(settings)
+        config.save_settings(settings)
         return _settings_payload()
 
     @app.get("/api/engines")

@@ -88,48 +88,47 @@ transcribe ./private.mp4 ru --engine local      # offline, nothing uploaded
 
 ## Web UI
 
-A modern UI (Vite + React + [shadcn/ui](https://ui.shadcn.com)) that talks to a
-FastAPI backend, with live progress and copy/download of the result.
+A local web app (Vite + React + [shadcn/ui](https://ui.shadcn.com)) talking to a
+FastAPI backend, with live progress and copy/download of the result. It runs
+entirely on your own machine — no cloud, no account, no password.
+
+Build it once, then start it:
 
 ```bash
-# 1. build the frontend once
 cd frontend && npm install && npm run build && cd ..
-
-# 2. run the server (serves the built UI + API)
 transcriber-server        # or: python -m backend.server
 # → http://127.0.0.1:8000
 ```
 
-For frontend development with hot reload, run the backend and `npm run dev` in
-`frontend/` (it proxies `/api` to the backend). See `frontend/README.md`.
+Or just double-click a launcher — it starts the server and opens the browser:
+**`Transcriber.bat`** on Windows, **`Transcriber.command`** on macOS.
+
+Then open http://127.0.0.1:8000 and go to **⚙️ Settings** to:
+- paste your **Groq API key** (free at https://console.groq.com/keys) — needed
+  for the fast cloud engine; the offline `local` engine works without any key;
+- optionally switch the interface language (RU/EN) and add a YouTube `cookies.txt`.
 
 ### Open it like an app
 
 The UI is an installable PWA. In Chrome or Edge, open the site and use the
-install icon in the address bar (or ⋮ menu → **Install / Add to apps**). You
-get a desktop/taskbar icon that launches it in its own window — no address bar,
-no "open the project". This works for the deployed URL too, so family members
-can install it like any app.
+install icon in the address bar (or ⋮ menu → **Install / Add to apps**). You get
+a desktop/taskbar icon that launches it in its own window — no address bar, no
+"open the project".
 
-### Access via link, on your own hardware (Tailscale Funnel)
+### Getting a cookies.txt
 
-Render's free tier is slow on big files. To get a public link that runs on
-**your** machine (fast CPU, offline engine, nothing uploaded to a cloud),
-expose the local server with [Tailscale Funnel](https://tailscale.com/kb/1223/funnel):
+Only needed when YouTube answers a download with "confirm you're not a bot".
+yt-dlp recommends exporting from an **incognito window** so YouTube doesn't
+rotate (invalidate) the cookies:
 
-1. Install Tailscale (https://tailscale.com/download/windows) and sign in once.
-2. In the admin console enable **MagicDNS + HTTPS** and allow **Funnel**.
-3. Run `powershell -ExecutionPolicy Bypass -File Install-Autostart.ps1`. It
-   starts the server hidden at every login and publishes it via a persisted
-   Tailscale Funnel, printing a public `https://<machine>.<tailnet>.ts.net` URL.
-4. Make sure `APP_PASSWORD` is set — the URL is public, so the password is its
-   only protection.
+1. Install the **"Get cookies.txt LOCALLY"** browser extension (Chrome/Edge/Firefox).
+2. Open a **private/incognito** window and sign in to `youtube.com`.
+3. Open a new tab and **close the YouTube tab** so the session isn't refreshed.
+4. Click the extension → **Export** — it downloads `cookies.txt` (stay in incognito).
+5. Close the incognito window, then upload the file in **Settings → YouTube cookies**.
 
-To undo: delete `Transcriber.vbs` from the Startup folder and run
-`tailscale serve reset`.
-
-The link only works while your PC is on and the funnel is running, so keep
-Render as the always-on fallback for when the machine is asleep.
+For frontend development with hot reload, run the backend and `npm run dev` in
+`frontend/` (it proxies `/api` to the backend). See `frontend/README.md`.
 
 ## Flags and environment variables
 
@@ -141,17 +140,15 @@ Render as the always-on fallback for when the machine is asleep.
 | `--keep` | Keep the downloaded audio (stays in `data/downloads/`). |
 | `-i, --interactive` | Prompt for the URL and language step by step. |
 | `TRANSCRIBER_ENGINE` | Force the default engine; if unset it's auto-resolved from your config. |
-| `GROQ_API_KEY` | Groq API key (cloud engine). |
+| `GROQ_API_KEY` | Groq API key. Optional — the web UI stores the key you enter in Settings; this env var is a fallback (handy for CLI use). |
 | `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
 | `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3`). |
 | `WHISPER_DEVICE` | `auto` / `cpu` / `cuda` for the local engine. |
-| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). The web UI uses one shared `cookies.txt` uploaded in Settings instead. |
+| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). The web UI uses a `cookies.txt` uploaded in Settings instead. |
 | `SCAN_CONCURRENCY` | Parallel files in `scan` mode (default 3). |
-| `PORT` | Web server port (default 8000; injected by most PaaS). |
-| `HOST` | Bind address (default `127.0.0.1`; use `0.0.0.0` in a container). |
-| `APP_PASSWORD` | Shared password for the web UI. Set it → login required; unset → open. This is the only switch for access. Always set it on a public deployment. |
-| `SESSION_SECRET` | Optional key for signing the login cookie (defaults to `APP_PASSWORD`). |
-| `MAX_UPLOAD_MB` | Reject web uploads larger than this (default 4096; `render.yaml` sets 1024 for the free tier). |
+| `PORT` | Web server port (default 8000). |
+| `HOST` | Bind address (default `127.0.0.1`). |
+| `MAX_UPLOAD_MB` | Reject web uploads larger than this (default 4096). |
 | `PDF_FONT` | Optional path to a Unicode `.ttf` for PDF export (a system font is used otherwise). |
 
 ## How it works
@@ -165,92 +162,24 @@ Render as the always-on fallback for when the machine is asleep.
 4. **Format** — merge segments into readable paragraphs, subtitle cues, or JSON,
    and save the transcript to `data/transcripts/`.
 
-## Run your own copy (free hosting)
-
-Anyone can fork this repo and stand up their own private instance — no code
-changes required. The repo ships a `Dockerfile` and a Render `render.yaml`
-configured for the **cloud (Groq) engine** (the only one that fits a free
-tier). The image builds the React UI, installs ffmpeg + yt-dlp, and serves the
-whole app from one port, behind a password you choose.
-
-**What you need (both free):**
-1. A [GitHub](https://github.com/) account — to fork the repo.
-2. A [Groq API key](https://console.groq.com/keys) — sign up, create a key
-   (`gsk_...`). This is what does the transcription.
-
-**Deploy on [Render](https://render.com) (~5 minutes):**
-1. **Fork** this repo to your own GitHub account (top-right *Fork* button).
-2. On Render: **New → Blueprint**, connect GitHub, and pick your fork. Render
-   reads `render.yaml` and creates the service automatically.
-3. Open the new service → **Environment**, and add two values:
-   - `GROQ_API_KEY` — the key from step 2 above.
-   - `APP_PASSWORD` — a password you invent. Everyone who uses your instance
-     will type it once.
-4. Wait for the first build to finish, then open the service URL. A login page
-   asks for the password, and you're in.
-5. Share the URL **and** the password with the people you want to let in.
-
-Once inside: pick a language (Русский/English), a format (txt/srt/vtt/json/docx/pdf),
-paste a link or drop a file, and hit transcribe. The **Settings** dialog (gear
-icon) also lets you switch the interface language (RU/EN) and manage:
-- **YouTube cookies** — a single shared `cookies.txt`, uploaded once and stored
-  on the server, then used automatically for every URL job. So one person sets
-  it up and everyone else (family included) never touches cookies. See
-  [Getting a cookies.txt](#getting-a-cookiestxt) below.
-
-Whether a login is required is decided solely by `APP_PASSWORD`: set it on the
-server and the site asks for the password; leave it unset and the site is open.
-The Settings dialog shows the current state but doesn't change it — that keeps
-the rule in one place and safe across restarts (Settings just reports it).
-
-### Getting a cookies.txt
-
-Only needed when YouTube answers a download with "confirm you're not a bot"
-(more common from a cloud server than from home). To create one:
-
-1. Install the **"Get cookies.txt LOCALLY"** browser extension (Chrome/Edge/Firefox).
-2. Open `youtube.com` and sign in.
-3. Click the extension → **Export** — it downloads `cookies.txt`.
-4. Upload it in **Settings → YouTube cookies**. Refresh every couple of months
-   or whenever downloads start failing again.
-
-> Prefer one click? This button deploys the canonical repo directly (you still
-> set the two secrets afterwards):
->
-> [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SerjShl/video-audio-transcriber)
-
-**Good to know:**
-- Access is gated only by `APP_PASSWORD`. Without it the instance is open to
-  anyone who finds the URL, and they'd spend *your* Groq quota — always set it.
-- The free instance sleeps after ~15 min idle; the next request takes ~30 s to
-  wake it. Fine for occasional personal use.
-- **File upload** is the reliable path in the cloud. YouTube often blocks
-  downloads from datacenter IPs, so pasting a link may fail on the server even
-  though it works on your own machine.
-- The offline `local` engine is intentionally excluded from the deployed image
-  (it needs ~1 GB of model and far more RAM than a free tier gives). It's only
-  for running on your own machine.
-- Any Docker host works the same way (Fly.io, Cloud Run, a VPS): build the
-  image and pass `GROQ_API_KEY`, `APP_PASSWORD`, and `HOST=0.0.0.0`.
-
 ## Project structure
 
 ```
 backend/                # Python package
   config.py             # constants and directory setup
   cli.py                # argument parsing, interactive mode, dispatch
-  server.py             # FastAPI backend with SSE progress + optional password
+  server.py             # FastAPI backend with SSE progress
   deps.py               # external command checks (ffmpeg, yt-dlp)
   download.py           # media download via yt-dlp
   audio.py              # ffmpeg/ffprobe: probe, convert, split
   pipeline.py           # orchestration: compress → split → transcribe → stitch
-  formatting.py         # txt / srt / vtt / json rendering
+  formatting.py         # txt / srt / vtt / json / docx / pdf rendering
   pool.py               # concurrency pool and retry/backoff
   engines/              # groq (cloud) and local (faster-whisper)
 frontend/               # Vite + React + shadcn/ui web UI
 tests/                  # pytest suite (no external services needed)
-Dockerfile              # container image (frontend build + Python runtime)
-render.yaml             # one-click Render deployment
+Transcriber.bat         # Windows launcher (double-click)
+Transcriber.command     # macOS launcher (double-click)
 ```
 
 ## Development

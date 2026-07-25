@@ -4,6 +4,7 @@ Values are read from the environment once at import time so the rest of the
 package can stay free of ``os.environ`` lookups.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -16,6 +17,28 @@ DIRS = {
     "transcripts": DATA_DIR / "transcripts",
     "input": DATA_DIR / "input",
 }
+
+# Runtime settings the user edits in the app (Groq key, YouTube cookies name),
+# stored next to the data files. Kept local — nothing here is ever served back.
+SETTINGS_PATH = DATA_DIR / "settings.json"
+COOKIES_PATH = DATA_DIR / "cookies.txt"
+
+
+def load_settings() -> dict:
+    try:
+        return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_settings(settings: dict) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+
+def groq_api_key() -> str:
+    """The Groq key entered in the app Settings, falling back to the env var."""
+    return (load_settings().get("groq_api_key") or os.environ.get("GROQ_API_KEY") or "").strip()
 
 # Transcription engine: "groq" (cloud API) or "local" (offline faster-whisper).
 # When TRANSCRIBER_ENGINE is unset the default is resolved at runtime from what's

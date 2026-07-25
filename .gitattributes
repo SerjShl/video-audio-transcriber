@@ -1,3 +1,4 @@
-# Windows batch files must stay CRLF or cmd.exe mis-parses them
+# Keep line endings sane per platform so the launchers run correctly
 *.bat text eol=crlf
+*.command text eol=lf
 *.sh text eol=lf

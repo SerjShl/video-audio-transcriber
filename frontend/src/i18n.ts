@@ -47,11 +47,13 @@ type Strings = {
   settingsTitle: string;
   settingsDesc: string;
   uiLangEyebrow: string;
-  accessEyebrow: string;
-  accessProtected: string;
-  accessProtectedDesc: string;
-  accessOpen: string;
-  accessOpenDesc: string;
+  groqEyebrow: string;
+  groqDesc: string;
+  groqPlaceholder: string;
+  groqSave: string;
+  groqSaved: string;
+  groqRemove: string;
+  groqGetKey: string;
   modeEyebrow: string;
   modeNote: string;
   cookiesEyebrow: string;
@@ -64,6 +66,7 @@ type Strings = {
   cookiesStep2: string;
   cookiesStep3: string;
   cookiesStep4: string;
+  cookiesStep5: string;
   cookiesStoreLink: string;
   engineLabels: Record<string, string>;
   engineUnavailable: string;
@@ -111,13 +114,14 @@ export const STRINGS: Record<UiLang, Strings> = {
     settingsTitle: "Настройки",
     settingsDesc: "Язык интерфейса, доступ и загрузка с YouTube",
     uiLangEyebrow: "Язык интерфейса",
-    accessEyebrow: "Доступ",
-    accessProtected: "Защищено паролем",
-    accessProtectedDesc:
-      "Сайт открывается только по паролю. Пароль задаётся переменной APP_PASSWORD на сервере.",
-    accessOpen: "Открытый доступ",
-    accessOpenDesc:
-      "Пароль не задан — доступ открыт всем. Задайте APP_PASSWORD на сервере, чтобы включить вход.",
+    groqEyebrow: "Groq API-ключ",
+    groqDesc:
+      "Нужен для облачного движка «Онлайн» (быстрый). Движок «На устройстве» работает и без ключа. Ключ хранится только у тебя на компьютере.",
+    groqPlaceholder: "gsk_…",
+    groqSave: "Сохранить",
+    groqSaved: "Ключ сохранён",
+    groqRemove: "Удалить",
+    groqGetKey: "Получить ключ",
     modeEyebrow: "Режим распознавания",
     modeNote:
       "«Онлайн» работает через облако и быстрее. «На устройстве» медленнее, зато запись никуда не отправляется.",
@@ -128,11 +132,11 @@ export const STRINGS: Record<UiLang, Strings> = {
     cookiesReplace: "Заменить",
     cookiesUpload: "Загрузить cookies.txt",
     cookiesGuide: "Как получить cookies.txt?",
-    cookiesStep1: "Установите расширение «Get cookies.txt LOCALLY» для Chrome, Edge или Firefox.",
-    cookiesStep2: "Откройте youtube.com и войдите в свой аккаунт.",
-    cookiesStep3: "Нажмите на иконку расширения → Export: скачается файл cookies.txt.",
-    cookiesStep4:
-      "Загрузите его здесь. Обновляйте раз в пару месяцев или если перестанет работать.",
+    cookiesStep1: "Установите расширение «Get cookies.txt LOCALLY» (Chrome, Edge или Firefox).",
+    cookiesStep2: "Откройте окно в режиме инкогнито и войдите на youtube.com.",
+    cookiesStep3: "Откройте новую вкладку и закройте вкладку YouTube — чтобы сессия не обновилась.",
+    cookiesStep4: "Нажмите на иконку расширения → Export: скачается cookies.txt (не выходя из инкогнито).",
+    cookiesStep5: "Закройте окно инкогнито и загрузите cookies.txt здесь.",
     cookiesStoreLink: "Открыть расширение в Chrome Web Store",
     engineLabels: { groq: "Онлайн · быстро", local: "На устройстве · приватно" },
     engineUnavailable: "недоступно",
@@ -185,13 +189,14 @@ export const STRINGS: Record<UiLang, Strings> = {
     settingsTitle: "Settings",
     settingsDesc: "Interface language, access and YouTube downloads",
     uiLangEyebrow: "Interface language",
-    accessEyebrow: "Access",
-    accessProtected: "Password protected",
-    accessProtectedDesc:
-      "The site opens only with the password. It's set via the APP_PASSWORD variable on the server.",
-    accessOpen: "Open access",
-    accessOpenDesc:
-      "No password is set — anyone can use it. Set APP_PASSWORD on the server to require a login.",
+    groqEyebrow: "Groq API key",
+    groqDesc:
+      "Needed for the cloud \"Online\" engine (fast). The \"On device\" engine works without it. The key is stored only on your computer.",
+    groqPlaceholder: "gsk_…",
+    groqSave: "Save",
+    groqSaved: "Key saved",
+    groqRemove: "Remove",
+    groqGetKey: "Get a key",
     modeEyebrow: "Recognition mode",
     modeNote:
       "\"Online\" runs in the cloud and is faster. \"On device\" is slower but nothing leaves your machine.",
@@ -202,10 +207,11 @@ export const STRINGS: Record<UiLang, Strings> = {
     cookiesReplace: "Replace",
     cookiesUpload: "Upload cookies.txt",
     cookiesGuide: "How do I get a cookies.txt?",
-    cookiesStep1: "Install the \"Get cookies.txt LOCALLY\" extension for Chrome, Edge or Firefox.",
-    cookiesStep2: "Open youtube.com and sign in to your account.",
-    cookiesStep3: "Click the extension icon → Export: it downloads a cookies.txt file.",
-    cookiesStep4: "Upload it here. Refresh it every couple of months or when downloads start failing.",
+    cookiesStep1: "Install the \"Get cookies.txt LOCALLY\" extension (Chrome, Edge or Firefox).",
+    cookiesStep2: "Open a private/incognito window and sign in to youtube.com.",
+    cookiesStep3: "Open a new tab and close the YouTube tab, so the session isn't refreshed.",
+    cookiesStep4: "Click the extension icon → Export: it downloads cookies.txt (stay in incognito).",
+    cookiesStep5: "Close the incognito window, then upload cookies.txt here.",
     cookiesStoreLink: "Open the extension in the Chrome Web Store",
     engineLabels: { groq: "Online · fast", local: "On device · private" },
     engineUnavailable: "unavailable",

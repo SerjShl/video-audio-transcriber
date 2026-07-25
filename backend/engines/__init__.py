@@ -3,6 +3,7 @@
 import importlib.util
 import os
 
+from .. import config
 from .groq import GroqEngine
 from .local import LocalEngine
 
@@ -26,8 +27,8 @@ def local_available():
 def engine_availability(name):
     """Return (available, note) describing whether an engine can run right now."""
     if name == "groq":
-        ok = bool(os.environ.get("GROQ_API_KEY"))
-        return ok, "" if ok else "no GROQ_API_KEY"
+        ok = bool(config.groq_api_key())
+        return ok, "" if ok else "no Groq API key"
     if name == "local":
         ok = local_available()
         return ok, "" if ok else "faster-whisper not installed"
@@ -45,11 +46,16 @@ def resolve_default_engine():
     explicit = os.environ.get("TRANSCRIBER_ENGINE")
     if explicit:
         return explicit, f"TRANSCRIBER_ENGINE={explicit}"
-    if os.environ.get("GROQ_API_KEY"):
-        return "groq", "GROQ_API_KEY found"
+    if config.groq_api_key():
+        return "groq", "Groq API key set"
     if local_available():
-        return "local", "no GROQ_API_KEY; faster-whisper installed"
+        return "local", "no Groq key; faster-whisper installed"
     return "groq", "default"
+
+
+def reset_engine(name):
+    """Drop a cached engine instance so it rebuilds (e.g. after the key changes)."""
+    _instances.pop(name, None)
 
 
 def get_engine(name=None):

@@ -79,13 +79,12 @@ def test_download_serves_the_result_file(client, tmp_path):
         server._jobs.pop(job.id, None)
 
 
-def test_login_gate_and_flow(monkeypatch, tmp_path):
+def test_login_gate_and_flow(monkeypatch):
     from fastapi.testclient import TestClient
 
     import backend.server as server
 
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
-    monkeypatch.setattr(server, "_SETTINGS_PATH", tmp_path / "settings.json")
     client = TestClient(server.create_app())
 
     # The API is gated until login; the status endpoint stays reachable.
@@ -142,13 +141,12 @@ def test_rejects_oversized_upload(client, monkeypatch):
     assert res.status_code == 413
 
 
-def test_login_is_rate_limited(monkeypatch, tmp_path):
+def test_login_is_rate_limited(monkeypatch):
     from fastapi.testclient import TestClient
 
     import backend.server as server
 
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
-    monkeypatch.setattr(server, "_SETTINGS_PATH", tmp_path / "settings.json")
     monkeypatch.setattr(server, "_login_fails", {})
     client = TestClient(server.create_app())
 
@@ -161,11 +159,12 @@ def test_login_is_rate_limited(monkeypatch, tmp_path):
 def test_shared_cookies_upload_and_delete(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
+    import backend.config as config
     import backend.server as server
 
     monkeypatch.delenv("APP_PASSWORD", raising=False)
-    monkeypatch.setattr(server, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(server, "_SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(config, "COOKIES_PATH", tmp_path / "cookies.txt")
+    monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
     client = TestClient(server.create_app())
 
     assert client.get("/api/settings").json()["cookies"] == {"present": False, "name": None}
@@ -180,6 +179,23 @@ def test_shared_cookies_upload_and_delete(monkeypatch, tmp_path):
 
     assert client.delete("/api/cookies").json()["cookies"] == {"present": False, "name": None}
     assert not (tmp_path / "cookies.txt").exists()
+
+
+def test_groq_key_set_and_clear(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    import backend.config as config
+    import backend.server as server
+
+    monkeypatch.delenv("APP_PASSWORD", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
+    client = TestClient(server.create_app())
+
+    assert client.get("/api/settings").json()["groqKeySet"] is False
+    assert client.post("/api/groq-key", json={"key": "gsk_abc"}).json()["groqKeySet"] is True
+    assert config.groq_api_key() == "gsk_abc"
+    assert client.post("/api/groq-key", json={"key": ""}).json()["groqKeySet"] is False
 
 
 def test_run_job_produces_a_done_result(monkeypatch, tmp_path):

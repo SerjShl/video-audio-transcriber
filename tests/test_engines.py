@@ -38,6 +38,9 @@ def test_every_engine_exposes_the_common_interface():
 def _clear_env(monkeypatch):
     monkeypatch.delenv("TRANSCRIBER_ENGINE", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    # Ignore any key a real data/settings.json might hold, so resolution is
+    # driven only by the env in these tests.
+    monkeypatch.setattr("backend.config.load_settings", lambda: {})
 
 
 def test_resolve_respects_explicit_env(monkeypatch):

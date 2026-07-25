@@ -8,6 +8,7 @@ import {
   FileAudio,
   HelpCircle,
   Languages,
+  KeyRound,
   Link2,
   Loader2,
   Lock,
@@ -16,7 +17,6 @@ import {
   Radio,
   RefreshCw,
   Settings2,
-  ShieldCheck,
   Sun,
   Trash2,
   Upload,
@@ -111,7 +111,6 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [authed, setAuthed] = useState(false);
-  const [passwordConfigured, setPasswordConfigured] = useState(false);
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
@@ -120,6 +119,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cookies, setCookies] = useState<Cookies>({ present: false, name: null });
   const [cookiesBusy, setCookiesBusy] = useState(false);
+  const [groqKeySet, setGroqKeySet] = useState(false);
+  const [groqKeyInput, setGroqKeyInput] = useState("");
+  const [groqBusy, setGroqBusy] = useState(false);
 
   // --- form ---
   const [mode, setMode] = useState<"url" | "file">("url");
@@ -208,10 +210,45 @@ export default function App() {
       .then((d) => {
         if (!d) return;
         setAuthRequired(Boolean(d.authRequired));
-        setPasswordConfigured(Boolean(d.passwordConfigured));
+        setGroqKeySet(Boolean(d.groqKeySet));
         if (d.cookies) setCookies(d.cookies);
       })
       .catch(() => {});
+  }
+
+  async function saveGroqKey() {
+    setGroqBusy(true);
+    try {
+      const res = await fetch("/api/groq-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: groqKeyInput.trim() }),
+      });
+      if (res.ok) {
+        setGroqKeySet(Boolean((await res.json()).groqKeySet));
+        setGroqKeyInput("");
+        loadEngines(); // groq becomes available/unavailable
+      }
+    } finally {
+      setGroqBusy(false);
+    }
+  }
+
+  async function clearGroqKey() {
+    setGroqBusy(true);
+    try {
+      const res = await fetch("/api/groq-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "" }),
+      });
+      if (res.ok) {
+        setGroqKeySet(false);
+        loadEngines();
+      }
+    } finally {
+      setGroqBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -219,7 +256,6 @@ export default function App() {
       .then((r) => r.json())
       .then((d) => {
         setAuthRequired(Boolean(d.required));
-        setPasswordConfigured(Boolean(d.passwordConfigured));
         setAuthed(Boolean(d.authed));
         if (d.authed) {
           loadEngines();
@@ -722,28 +758,47 @@ export default function App() {
               </Select>
             </section>
 
-            {/* Access (informational — governed by APP_PASSWORD on the server) */}
+            {/* Groq API key */}
             <section className="rounded-xl border bg-background/50 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-                <span className="eyebrow">{t.accessEyebrow}</span>
+              <div className="mb-2 flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-primary" />
+                <span className="eyebrow">{t.groqEyebrow}</span>
               </div>
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                    passwordConfigured ? "bg-primary" : "bg-muted-foreground/40",
-                  )}
-                />
-                <div>
-                  <p className="text-sm font-medium">
-                    {passwordConfigured ? t.accessProtected : t.accessOpen}
-                  </p>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {passwordConfigured ? t.accessProtectedDesc : t.accessOpenDesc}
-                  </p>
+              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t.groqDesc}</p>
+              {groqKeySet ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                    {t.groqSaved}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={clearGroqKey} disabled={groqBusy}>
+                    <Trash2 className="h-4 w-4" /> {t.groqRemove}
+                  </Button>
                 </div>
-              </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    placeholder={t.groqPlaceholder}
+                    value={groqKeyInput}
+                    onChange={(e) => setGroqKeyInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveGroqKey();
+                    }}
+                  />
+                  <Button onClick={saveGroqKey} disabled={groqBusy || !groqKeyInput.trim()}>
+                    {groqBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t.groqSave}
+                  </Button>
+                </div>
+              )}
+              <a
+                href="https://console.groq.com/keys"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                {t.groqGetKey} <ExternalLink className="h-3 w-3" />
+              </a>
             </section>
 
             {/* Recognition mode — shown only when more than one engine works here */}
@@ -824,6 +879,7 @@ export default function App() {
                   <li>{t.cookiesStep2}</li>
                   <li>{t.cookiesStep3}</li>
                   <li>{t.cookiesStep4}</li>
+                  <li>{t.cookiesStep5}</li>
                 </ol>
                 <a
                   href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
