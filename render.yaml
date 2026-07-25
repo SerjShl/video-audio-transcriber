@@ -1,0 +1,22 @@
+# Render Blueprint — deploy with one click from the repo.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# After the first deploy, set the two secret values in the Render dashboard
+# (Environment): GROQ_API_KEY and APP_PASSWORD. Render injects $PORT itself.
+services:
+  - type: web
+    name: video-audio-transcriber
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: TRANSCRIBER_ENGINE
+        value: groq
+      - key: HOST
+        value: 0.0.0.0
+      - key: GROQ_API_KEY
+        sync: false        # set in the dashboard (secret)
+      - key: APP_PASSWORD
+        sync: false        # shared login password (secret)

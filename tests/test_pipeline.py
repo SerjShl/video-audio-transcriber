@@ -1,4 +1,4 @@
-from transcriber.pipeline import offset_segments
+from backend.pipeline import offset_segments
 
 
 def test_offset_segments_returns_input_for_zero_offset():

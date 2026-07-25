@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from transcriber.pool import run_pool, with_retry
+from backend.pool import run_pool, with_retry
 
 
 def test_run_pool_preserves_input_order():

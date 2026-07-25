@@ -8,7 +8,7 @@ from pathlib import Path
 from .audio import convert_to_audio, get_duration, size_mb, split_audio
 from .config import DEFAULT_LANGUAGE, DIRS, MIN_CHUNK_BYTES
 from .engines import get_engine
-from .formatting import render_transcript
+from .formatting import render_output
 
 
 def offset_segments(segments, offset):
@@ -87,13 +87,13 @@ def transcribe(audio_path, language, engine=None):
 
 def save_transcript(filename, segments, fmt="txt", output_dir=None):
     output_dir = Path(output_dir) if output_dir else DIRS["transcripts"]
-    text = render_transcript(segments, fmt)
+    preview, data, _media_type = render_output(segments, fmt)
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / f"{filename}.{fmt}"
 
-    out_path.write_text(text, encoding="utf-8")
+    out_path.write_bytes(data)
     print(f"\n✅ Saved: {out_path}\n")
-    print(text[:500] + ("..." if len(text) > 500 else ""))
+    print(preview[:500] + ("..." if len(preview) > 500 else ""))
     return out_path
 
 
