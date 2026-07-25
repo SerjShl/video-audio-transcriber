@@ -34,6 +34,7 @@ type Strings = {
   statusSplitting: string;
   statusTranscribing: string;
   statusPart: string;
+  largeFileHint: string;
   errorTitle: string;
   copy: string;
   copied: string;
@@ -97,6 +98,7 @@ export const STRINGS: Record<UiLang, Strings> = {
     statusSplitting: "Разбиваю на части…",
     statusTranscribing: "Распознаю речь…",
     statusPart: "Распознаю часть {n} из {total}…",
+    largeFileHint: "Большие файлы могут занять несколько минут — это нормально.",
     errorTitle: "Ошибка",
     copy: "Копировать",
     copied: "Скопировано",
@@ -170,6 +172,7 @@ export const STRINGS: Record<UiLang, Strings> = {
     statusSplitting: "Splitting into parts…",
     statusTranscribing: "Transcribing…",
     statusPart: "Transcribing part {n} of {total}…",
+    largeFileHint: "Large files can take a few minutes — that's normal.",
     errorTitle: "Error",
     copy: "Copy",
     copied: "Copied",

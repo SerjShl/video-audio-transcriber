@@ -624,6 +624,7 @@ export default function App() {
                   </span>
                 )}
               </div>
+              {running && <p className="text-xs text-muted-foreground/80">{t.largeFileHint}</p>}
               {logs.length > 0 && (
                 <details>
                   <summary className="cursor-pointer text-xs text-muted-foreground transition-colors hover:text-foreground">
