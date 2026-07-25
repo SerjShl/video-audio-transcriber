@@ -142,7 +142,7 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 | `TRANSCRIBER_ENGINE` | Force the default engine; if unset it's auto-resolved from your config. |
 | `GROQ_API_KEY` | Groq API key. Optional — the web UI stores the key you enter in Settings; this env var is a fallback (handy for CLI use). |
 | `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
-| `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3`). |
+| `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3-turbo` — fast on CPU). |
 | `WHISPER_DEVICE` | `auto` / `cpu` / `cuda` for the local engine. |
 | `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). The web UI uses a `cookies.txt` uploaded in Settings instead. |
 | `SCAN_CONCURRENCY` | Parallel files in `scan` mode (default 3). |

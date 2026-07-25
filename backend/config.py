@@ -56,11 +56,11 @@ WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "whisper-large-v3-turbo")
 
 # Local engine (faster-whisper). The model is downloaded once and cached; after
 # that the engine runs fully offline and reuses the loaded model across files.
-LOCAL_MODEL = os.environ.get("WHISPER_LOCAL_MODEL", "large-v3")
+LOCAL_MODEL = os.environ.get("WHISPER_LOCAL_MODEL", "large-v3-turbo")
 # Default to CPU: it works everywhere. Set WHISPER_DEVICE=cuda (or auto) only if
 # you have a working CUDA runtime — otherwise CTranslate2 fails on cublas DLLs.
 LOCAL_DEVICE = os.environ.get("WHISPER_DEVICE", "cpu")  # cpu | cuda | auto
-LOCAL_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "default")
+LOCAL_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "int8")
 
 PARAGRAPH_MIN_CHARS = 280
 MIN_CHUNK_BYTES = 2048
