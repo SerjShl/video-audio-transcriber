@@ -103,7 +103,7 @@ function Waveform({ bars = 5, className }: { bars?: number; className?: string }
 }
 
 export default function App() {
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => localStorage.getItem("vat_dark") !== "0");
   const [uiLang, setUiLang] = useState<UiLang>(getInitialUiLang);
   const t = STRINGS[uiLang];
 
@@ -124,14 +124,16 @@ export default function App() {
   const [groqBusy, setGroqBusy] = useState(false);
 
   // --- form ---
-  const [mode, setMode] = useState<"url" | "file">("url");
+  const [mode, setMode] = useState<"url" | "file">(() =>
+    localStorage.getItem("vat_mode") === "file" ? "file" : "url",
+  );
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const [language, setLanguage] = useState(() => localStorage.getItem("vat_language") || "ru");
   const [format, setFormat] = useState(() => localStorage.getItem("vat_format") || "txt");
-  const [engine, setEngine] = useState("groq");
+  const [engine, setEngine] = useState(() => localStorage.getItem("vat_engine") || "groq");
   const [engines, setEngines] = useState<EngineInfo[]>([
     { name: "groq", available: true, note: "" },
   ]);
@@ -151,7 +153,28 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
+    try {
+      localStorage.setItem("vat_dark", dark ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
   }, [dark]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("vat_mode", mode);
+    } catch {
+      /* ignore */
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("vat_engine", engine);
+    } catch {
+      /* ignore */
+    }
+  }, [engine]);
 
   useEffect(() => {
     document.documentElement.lang = uiLang;
@@ -199,7 +222,10 @@ export default function App() {
         if (!d) return;
         setEngines(d.engines);
         setFormats(d.formats);
-        setEngine(d.default);
+        // Restore the last engine if it's still available; else server default.
+        const saved = localStorage.getItem("vat_engine");
+        const available = d.engines.filter((e: EngineInfo) => e.available).map((e: EngineInfo) => e.name);
+        setEngine(saved && available.includes(saved) ? saved : d.default);
       })
       .catch(() => {});
   }
