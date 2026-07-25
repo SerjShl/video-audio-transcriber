@@ -299,6 +299,9 @@ export default function App() {
     ...FORMAT_ORDER.filter((f) => formats.includes(f)),
     ...formats.filter((f) => !FORMAT_ORDER.includes(f)),
   ];
+  // Only offer an engine choice when more than one actually works here (e.g.
+  // locally). In the cloud only Groq is installed, so the picker is hidden.
+  const availableEngines = engines.filter((e) => e.available);
 
   async function start() {
     setStatus("running");
@@ -743,8 +746,8 @@ export default function App() {
               </div>
             </section>
 
-            {/* Recognition mode (only when more than one engine is around) */}
-            {engines.length > 1 && (
+            {/* Recognition mode — shown only when more than one engine works here */}
+            {availableEngines.length > 1 && (
               <section className="rounded-xl border bg-background/50 p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Radio className="h-4 w-4 text-primary" />
@@ -755,10 +758,9 @@ export default function App() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {engines.map((e) => (
-                      <SelectItem key={e.name} value={e.name} disabled={!e.available}>
+                    {availableEngines.map((e) => (
+                      <SelectItem key={e.name} value={e.name}>
                         {t.engineLabels[e.name] ?? e.name}
-                        {e.available ? "" : ` · ${t.engineUnavailable}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
