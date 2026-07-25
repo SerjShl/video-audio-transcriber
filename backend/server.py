@@ -84,14 +84,12 @@ def _cookies_meta():
 
 
 def auth_required():
-    """Whether the web UI currently gates access behind the password.
+    """Whether the web UI gates access behind the password.
 
-    Requires a password to be configured at all; within that, a runtime toggle
-    (persisted in data/settings.json) can turn the gate off. Defaults to on.
+    Governed solely by whether APP_PASSWORD is configured on the server — one
+    place, survives restarts, and can't silently turn off on an ephemeral disk.
     """
-    if not password_configured():
-        return False
-    return bool(_load_settings().get("auth_required", True))
+    return password_configured()
 
 
 def _session_secret():
@@ -371,21 +369,6 @@ def create_app():
 
     @app.get("/api/settings")
     def get_settings():
-        return _settings_payload()
-
-    @app.post("/api/settings")
-    async def update_settings(request: Request):
-        try:
-            body = await request.json()
-        except Exception:
-            body = dict(await request.form())
-        settings = _load_settings()
-        if "authRequired" in body:
-            want = bool(body["authRequired"])
-            if want and not password_configured():
-                raise HTTPException(400, "Set an APP_PASSWORD before requiring login.")
-            settings["auth_required"] = want
-        _save_settings(settings)
         return _settings_payload()
 
     @app.post("/api/cookies")

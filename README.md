@@ -163,14 +163,16 @@ whole app from one port, behind a password you choose.
 
 Once inside: pick a language (Русский/English), a format (txt/srt/vtt/json/docx/pdf),
 paste a link or drop a file, and hit transcribe. The **Settings** dialog (gear
-icon) has two controls:
+icon) also lets you switch the interface language (RU/EN) and manage:
 - **YouTube cookies** — a single shared `cookies.txt`, uploaded once and stored
   on the server, then used automatically for every URL job. So one person sets
   it up and everyone else (family included) never touches cookies. See
   [Getting a cookies.txt](#getting-a-cookiestxt) below.
-- **Require password to enter** — toggle the login gate on/off at runtime
-  (stored in `data/settings.json`; on Render's ephemeral disk it resets to the
-  `APP_PASSWORD`-based default after a restart).
+
+Whether a login is required is decided solely by `APP_PASSWORD`: set it on the
+server and the site asks for the password; leave it unset and the site is open.
+The Settings dialog shows the current state but doesn't change it — that keeps
+the rule in one place and safe across restarts (Settings just reports it).
 
 ### Getting a cookies.txt
 

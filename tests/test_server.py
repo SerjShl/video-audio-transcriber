@@ -106,37 +106,22 @@ def test_login_gate_and_flow(monkeypatch, tmp_path):
     assert client.get("/api/engines").status_code == 401
 
 
-def test_settings_toggle_disables_login(monkeypatch, tmp_path):
+def test_auth_follows_app_password(monkeypatch):
     from fastapi.testclient import TestClient
 
     import backend.server as server
 
-    monkeypatch.setenv("APP_PASSWORD", "s3cret")
-    monkeypatch.setattr(server, "_SETTINGS_PATH", tmp_path / "settings.json")
-    client = TestClient(server.create_app())
-
-    client.post("/api/login", json={"password": "s3cret"})
-    settings = client.get("/api/settings").json()
-    assert settings["authRequired"] is True
-    assert settings["passwordConfigured"] is True
-
-    # Turn the login requirement off; the API is now open even without a cookie.
-    client.post("/api/settings", json={"authRequired": False})
-    client.post("/api/logout")
-    assert client.get("/api/engines").status_code == 200
-    assert client.get("/api/auth").json()["required"] is False
-
-
-def test_cannot_require_login_without_password(monkeypatch, tmp_path):
-    from fastapi.testclient import TestClient
-
-    import backend.server as server
-
+    # No password configured → the site is open, no login required.
     monkeypatch.delenv("APP_PASSWORD", raising=False)
-    monkeypatch.setattr(server, "_SETTINGS_PATH", tmp_path / "settings.json")
-    client = TestClient(server.create_app())
+    open_client = TestClient(server.create_app())
+    assert open_client.get("/api/auth").json()["required"] is False
+    assert open_client.get("/api/engines").status_code == 200
 
-    assert client.post("/api/settings", json={"authRequired": True}).status_code == 400
+    # Password configured → login is required.
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    gated_client = TestClient(server.create_app())
+    assert gated_client.get("/api/auth").json()["required"] is True
+    assert gated_client.get("/api/engines").status_code == 401
 
 
 def test_rejects_private_url(client):

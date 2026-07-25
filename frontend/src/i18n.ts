@@ -47,9 +47,10 @@ type Strings = {
   settingsDesc: string;
   uiLangEyebrow: string;
   accessEyebrow: string;
-  accessToggle: string;
-  accessOnDesc: string;
-  accessNeedPassword: string;
+  accessProtected: string;
+  accessProtectedDesc: string;
+  accessOpen: string;
+  accessOpenDesc: string;
   modeEyebrow: string;
   modeNote: string;
   cookiesEyebrow: string;
@@ -66,6 +67,7 @@ type Strings = {
   engineLabels: Record<string, string>;
   engineUnavailable: string;
   formatLabels: Record<string, string>;
+  spokenLabels: Record<string, string>;
 };
 
 export const STRINGS: Record<UiLang, Strings> = {
@@ -108,9 +110,12 @@ export const STRINGS: Record<UiLang, Strings> = {
     settingsDesc: "Язык интерфейса, доступ и загрузка с YouTube",
     uiLangEyebrow: "Язык интерфейса",
     accessEyebrow: "Доступ",
-    accessToggle: "Требовать пароль для входа",
-    accessOnDesc: "Когда включено — сайт открывается только по паролю.",
-    accessNeedPassword: "Задайте APP_PASSWORD на сервере, чтобы включить.",
+    accessProtected: "Защищено паролем",
+    accessProtectedDesc:
+      "Сайт открывается только по паролю. Пароль задаётся переменной APP_PASSWORD на сервере.",
+    accessOpen: "Открытый доступ",
+    accessOpenDesc:
+      "Пароль не задан — доступ открыт всем. Задайте APP_PASSWORD на сервере, чтобы включить вход.",
     modeEyebrow: "Режим распознавания",
     modeNote:
       "«Онлайн» работает через облако и быстрее. «На устройстве» медленнее, зато запись никуда не отправляется.",
@@ -137,6 +142,7 @@ export const STRINGS: Record<UiLang, Strings> = {
       vtt: "Субтитры (VTT)",
       json: "JSON (для разработчиков)",
     },
+    spokenLabels: { ru: "Русский", en: "Английский" },
   },
   en: {
     tagline: "Turn video and audio into text",
@@ -177,9 +183,12 @@ export const STRINGS: Record<UiLang, Strings> = {
     settingsDesc: "Interface language, access and YouTube downloads",
     uiLangEyebrow: "Interface language",
     accessEyebrow: "Access",
-    accessToggle: "Require a password to enter",
-    accessOnDesc: "When on, the site opens only with the password.",
-    accessNeedPassword: "Set APP_PASSWORD on the server to enable this.",
+    accessProtected: "Password protected",
+    accessProtectedDesc:
+      "The site opens only with the password. It's set via the APP_PASSWORD variable on the server.",
+    accessOpen: "Open access",
+    accessOpenDesc:
+      "No password is set — anyone can use it. Set APP_PASSWORD on the server to require a login.",
     modeEyebrow: "Recognition mode",
     modeNote:
       "\"Online\" runs in the cloud and is faster. \"On device\" is slower but nothing leaves your machine.",
@@ -205,6 +214,7 @@ export const STRINGS: Record<UiLang, Strings> = {
       vtt: "Subtitles (VTT)",
       json: "JSON (for developers)",
     },
+    spokenLabels: { ru: "Russian", en: "English" },
   },
 };
 

@@ -37,8 +37,11 @@ AUDIO_SAMPLE_RATE = "16000"
 AUDIO_CHANNELS = "1"
 AUDIO_BITRATE = "32k"
 
-# Reject web uploads larger than this (protects a small instance's disk/RAM).
-MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB") or 500)
+# Safety bound on web uploads. Generous by default so ordinary videos pass
+# through untouched — the pipeline compresses anything large to 16 kHz audio
+# before transcribing. Lower it on a small instance via the env var (see
+# render.yaml). Uploads stream straight to disk, never fully into RAM.
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB") or 4096)
 
 SCAN_CONCURRENCY = int(os.environ.get("SCAN_CONCURRENCY") or 3)
 SCAN_EXTENSIONS = {".mp4", ".mp3", ".wav", ".m4a", ".webm"}

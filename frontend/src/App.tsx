@@ -43,7 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -54,11 +53,8 @@ type Result = { text: string; filename: string; format: string };
 type EngineInfo = { name: string; available: boolean; note: string };
 type Cookies = { present: boolean; name: string | null };
 
-// Spoken languages Whisper listens for (shown natively in both UI locales).
-const SPOKEN_LANGUAGES = [
-  { code: "ru", label: "Русский" },
-  { code: "en", label: "English" },
-];
+// Spoken languages Whisper listens for (labels come from the UI locale).
+const SPOKEN_CODES = ["ru", "en"];
 
 const FORMAT_ORDER = ["txt", "docx", "pdf", "srt", "vtt", "json"];
 
@@ -272,19 +268,6 @@ export default function App() {
     setResult(null);
     setLogs([]);
     setError(null);
-  }
-
-  async function toggleAuthRequired(next: boolean) {
-    try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ authRequired: next }),
-      });
-      if (res.ok) setAuthRequired(Boolean((await res.json()).authRequired));
-    } catch {
-      /* ignore */
-    }
   }
 
   async function uploadCookies(f: File | null) {
@@ -583,9 +566,9 @@ export default function App() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SPOKEN_LANGUAGES.map((l) => (
-                      <SelectItem key={l.code} value={l.code}>
-                        {l.label}
+                    {SPOKEN_CODES.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {t.spokenLabels[code] ?? code}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -735,24 +718,27 @@ export default function App() {
               </Select>
             </section>
 
-            {/* Access */}
+            {/* Access (informational — governed by APP_PASSWORD on the server) */}
             <section className="rounded-xl border bg-background/50 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 <span className="eyebrow">{t.accessEyebrow}</span>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                    passwordConfigured ? "bg-primary" : "bg-muted-foreground/40",
+                  )}
+                />
                 <div>
-                  <p className="text-sm font-medium">{t.accessToggle}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {passwordConfigured ? t.accessOnDesc : t.accessNeedPassword}
+                  <p className="text-sm font-medium">
+                    {passwordConfigured ? t.accessProtected : t.accessOpen}
+                  </p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {passwordConfigured ? t.accessProtectedDesc : t.accessOpenDesc}
                   </p>
                 </div>
-                <Switch
-                  checked={authRequired}
-                  disabled={!passwordConfigured}
-                  onCheckedChange={toggleAuthRequired}
-                />
               </div>
             </section>
 
