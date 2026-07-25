@@ -100,8 +100,19 @@ transcriber-server        # or: python -m backend.server
 # → http://127.0.0.1:8000
 ```
 
+On Windows, double-clicking **`Transcriber.bat`** starts the server and opens
+the browser for you — no terminal needed.
+
 For frontend development with hot reload, run the backend and `npm run dev` in
 `frontend/` (it proxies `/api` to the backend). See `frontend/README.md`.
+
+### Open it like an app
+
+The UI is an installable PWA. In Chrome or Edge, open the site and use the
+install icon in the address bar (or ⋮ menu → **Install / Add to apps**). You
+get a desktop/taskbar icon that launches it in its own window — no address bar,
+no "open the project". This works for the deployed URL too, so family members
+can install it like any app.
 
 ## Flags and environment variables
 

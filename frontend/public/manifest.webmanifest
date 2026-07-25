@@ -1,0 +1,14 @@
+{
+  "name": "Transcriber",
+  "short_name": "Transcriber",
+  "description": "Расшифровка видео и аудио в текст",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0a0f",
+  "theme_color": "#12101a",
+  "icons": [
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ]
+}
