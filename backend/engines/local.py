@@ -34,11 +34,24 @@ class LocalEngine(Engine):
             from faster_whisper import WhisperModel
 
             print(f"📦 Loading local model '{LOCAL_MODEL}' ({LOCAL_DEVICE})...")
-            self._model = WhisperModel(
-                LOCAL_MODEL,
-                device=LOCAL_DEVICE,
-                compute_type=LOCAL_COMPUTE_TYPE,
-            )
+            try:
+                self._model = WhisperModel(
+                    LOCAL_MODEL,
+                    device=LOCAL_DEVICE,
+                    compute_type=LOCAL_COMPUTE_TYPE,
+                )
+            except Exception as error:
+                # A machine without a working CUDA runtime (e.g. missing
+                # cublas64_*.dll) fails when device is "auto"/"cuda". Fall back to
+                # CPU so the transcription still runs instead of hard-failing.
+                if LOCAL_DEVICE == "cpu":
+                    raise
+                print(f"⚠️  Could not start on '{LOCAL_DEVICE}' ({error}); falling back to CPU.")
+                self._model = WhisperModel(
+                    LOCAL_MODEL,
+                    device="cpu",
+                    compute_type="int8" if LOCAL_COMPUTE_TYPE == "default" else LOCAL_COMPUTE_TYPE,
+                )
         return self._model
 
     def transcribe_chunk(self, audio_path, language) -> list[dict]:

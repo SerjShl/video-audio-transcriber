@@ -14,20 +14,26 @@ dependencies = [
 [project.optional-dependencies]
 # Offline engine — heavier (CTranslate2 + model download), so it's opt-in.
 local = ["faster-whisper>=1.0"]
-# Web UI backend.
-server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
+# Web UI backend (incl. docx/pdf transcript export).
+server = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",
+    "python-docx>=1.1",
+    "fpdf2>=2.7",
+]
 dev = ["pytest>=8.0", "ruff>=0.5"]
 
 [project.scripts]
-transcribe = "transcriber.cli:main"
-transcriber-server = "transcriber.server:main"
+transcribe = "backend.cli:main"
+transcriber-server = "backend.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["transcriber*"]
+include = ["backend*"]
 
 [tool.ruff]
 line-length = 100

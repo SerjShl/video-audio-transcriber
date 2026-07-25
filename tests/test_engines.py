@@ -2,8 +2,8 @@ import math
 
 import pytest
 
-import transcriber.engines as engines_module
-from transcriber.engines import ENGINE_NAMES, get_engine, resolve_default_engine
+import backend.engines as engines_module
+from backend.engines import ENGINE_NAMES, get_engine, resolve_default_engine
 
 
 def test_get_engine_resolves_groq_with_finite_limit():

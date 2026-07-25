@@ -31,13 +31,15 @@ def build_parser():
         description="Transcribe a URL (YouTube and hundreds of other sites) or local "
         "audio/video files, in the cloud (Groq) or fully offline (faster-whisper).",
     )
-    parser.add_argument("input", nargs="?", help="URL, file path, or 'scan' for the input/ folder")
+    parser.add_argument(
+        "input", nargs="?", help="URL, file path, or 'scan' for the data/input/ folder"
+    )
     parser.add_argument(
         "language", nargs="?", default=DEFAULT_LANGUAGE, help="language code (default: ru)"
     )
     parser.add_argument("-f", "--format", default="txt", help="output format: txt, srt, vtt, json")
     parser.add_argument(
-        "-o", "--out", default=None, help="output directory (default: transcripts/)"
+        "-o", "--out", default=None, help="output directory (default: data/transcripts/)"
     )
     parser.add_argument(
         "-e", "--engine", default=None,
@@ -62,7 +64,7 @@ def parse_args(argv):
 
 
 def _ask_interactive():
-    prompt = "🔗 URL or file path (Enter — scan the input/ folder): "
+    prompt = "🔗 URL or file path (Enter — scan the data/input/ folder): "
     input_ = input(prompt).strip()
     language = input(f"🌐 Language [{DEFAULT_LANGUAGE}]: ").strip() or DEFAULT_LANGUAGE
     fmt = input("📄 Format [txt/srt/vtt/json] [txt]: ").strip().lower() or "txt"

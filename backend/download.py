@@ -7,12 +7,13 @@ from pathlib import Path
 from .config import DIRS
 
 
-def download_media(url) -> Path:
+def download_media(url, cookies_file=None) -> Path:
     print("⬇️  Downloading...")
     output_template = str(DIRS["downloads"] / "audio_%(id)s.%(ext)s")
     args = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", output_template]
 
-    cookies_file = os.environ.get("YT_DLP_COOKIES")
+    # An explicit per-request cookies file (web upload) wins over the env var.
+    cookies_file = cookies_file or os.environ.get("YT_DLP_COOKIES")
     browser = os.environ.get("YT_DLP_BROWSER")
     if cookies_file:
         print(f"🍪 Using cookies file: {cookies_file}")

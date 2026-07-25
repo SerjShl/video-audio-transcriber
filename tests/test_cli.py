@@ -1,4 +1,4 @@
-from transcriber.cli import parse_args
+from backend.cli import parse_args
 
 
 def test_parse_args_reads_positionals():

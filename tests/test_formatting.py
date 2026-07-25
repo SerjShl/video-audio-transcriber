@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from transcriber.formatting import (
+from backend.formatting import (
     format_timestamp,
     format_transcript,
     render_transcript,

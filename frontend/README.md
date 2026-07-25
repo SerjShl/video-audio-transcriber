@@ -1,13 +1,13 @@
 # Transcriber — web UI
 
 Vite + React + TypeScript + Tailwind, with [shadcn/ui](https://ui.shadcn.com)
-components. Talks to the FastAPI backend in `../transcriber/server.py`.
+components. Talks to the FastAPI backend in `../backend/server.py`.
 
 ## Develop
 
 ```bash
 # terminal 1 — backend (from the repo root)
-transcriber-server            # or: python -m transcriber.server
+transcriber-server            # or: python -m backend.server
 
 # terminal 2 — frontend dev server
 cd frontend
