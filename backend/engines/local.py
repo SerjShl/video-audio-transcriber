@@ -56,8 +56,16 @@ class LocalEngine(Engine):
 
     def transcribe_chunk(self, audio_path, language) -> list[dict]:
         model = self._load_model()
-        segments, _info = model.transcribe(str(Path(audio_path)), language=language)
-        return [
-            {"start": seg.start, "end": seg.end, "text": (seg.text or "").strip()}
-            for seg in segments
-        ]
+        segments, info = model.transcribe(str(Path(audio_path)), language=language)
+        total = float(getattr(info, "duration", 0) or 0)
+
+        result = []
+        next_percent = 10
+        for seg in segments:
+            result.append(
+                {"start": seg.start, "end": seg.end, "text": (seg.text or "").strip()}
+            )
+            if total and seg.end and (seg.end / total) * 100 >= next_percent:
+                print(f"   🎤 {min(int(seg.end / total * 100), 99)}%")
+                next_percent += 10
+        return result
