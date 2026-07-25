@@ -114,6 +114,21 @@ get a desktop/taskbar icon that launches it in its own window — no address bar
 no "open the project". This works for the deployed URL too, so family members
 can install it like any app.
 
+### Access via link, on your own hardware (Tailscale Funnel)
+
+Render's free tier is slow on big files. To get a public link that runs on
+**your** machine (fast CPU, offline engine, nothing uploaded to a cloud),
+expose the local server with [Tailscale Funnel](https://tailscale.com/kb/1223/funnel):
+
+1. Install Tailscale (https://tailscale.com/download/windows) and sign in once.
+2. In the admin console enable **MagicDNS + HTTPS** and allow **Funnel**.
+3. Double-click **`Transcriber-online.bat`** — it starts the server and prints a
+   public `https://<machine>.<tailnet>.ts.net` URL. Share that URL.
+4. Make sure `APP_PASSWORD` is set (it gates the public link).
+
+The link only works while your PC is on and the funnel is running, so keep
+Render as the always-on fallback for when the machine is asleep.
+
 ## Flags and environment variables
 
 | Option | Description |
