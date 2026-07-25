@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Status = "idle" | "running" | "done" | "error";
 type Result = { text: string; filename: string; format: string };
+type EngineInfo = { name: string; available: boolean; note: string };
 
 const ENGINE_LABELS: Record<string, string> = {
   groq: "Groq · cloud",
@@ -46,7 +47,9 @@ export default function App() {
   const [language, setLanguage] = useState("ru");
   const [format, setFormat] = useState("txt");
   const [engine, setEngine] = useState("groq");
-  const [engines, setEngines] = useState<string[]>(["groq", "local"]);
+  const [engines, setEngines] = useState<EngineInfo[]>([
+    { name: "groq", available: true, note: "" },
+  ]);
   const [formats, setFormats] = useState<string[]>(["txt", "srt", "vtt", "json"]);
 
   const [status, setStatus] = useState<Status>("idle");
@@ -264,8 +267,9 @@ export default function App() {
                   </SelectTrigger>
                   <SelectContent>
                     {engines.map((e) => (
-                      <SelectItem key={e} value={e}>
-                        {e}
+                      <SelectItem key={e.name} value={e.name} disabled={!e.available}>
+                        {e.name}
+                        {e.note ? ` · ${e.note}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -9,7 +9,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .config import (
-    DEFAULT_ENGINE,
     DEFAULT_LANGUAGE,
     DIRS,
     OUTPUT_FORMATS,
@@ -19,7 +18,7 @@ from .config import (
 )
 from .deps import ensure_command
 from .download import download_media
-from .engines import get_engine
+from .engines import get_engine, resolve_default_engine
 from .pipeline import process_file
 from .pool import run_pool
 
@@ -41,7 +40,8 @@ def build_parser():
         "-o", "--out", default=None, help="output directory (default: transcripts/)"
     )
     parser.add_argument(
-        "-e", "--engine", default=DEFAULT_ENGINE, help="engine: groq (cloud) or local (offline)"
+        "-e", "--engine", default=None,
+        help="engine: groq (cloud) or local (offline); auto-resolved if omitted",
     )
     parser.add_argument(
         "--keep",
@@ -111,8 +111,12 @@ def run(argv=None):
         )
         return 1
 
+    engine_name = opts.engine
     try:
-        engine = get_engine(opts.engine)
+        if engine_name is None:
+            engine_name, reason = resolve_default_engine()
+            print(f"⚙️  Engine: {engine_name} ({reason})")
+        engine = get_engine(engine_name)
         engine.ensure_ready()
     except (ValueError, RuntimeError) as error:
         print(f"❌ {error}", file=sys.stderr)

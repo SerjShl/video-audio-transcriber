@@ -17,10 +17,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .config import DEFAULT_ENGINE, DEFAULT_LANGUAGE, DIRS, OUTPUT_FORMATS, ROOT, ensure_dirs
+from .config import DEFAULT_LANGUAGE, DIRS, OUTPUT_FORMATS, ROOT, ensure_dirs
 from .deps import ensure_command
 from .download import download_media
-from .engines import ENGINE_NAMES, get_engine
+from .engines import ENGINE_NAMES, engine_availability, get_engine, resolve_default_engine
 from .formatting import render_transcript
 from .pipeline import transcribe
 
@@ -147,19 +147,25 @@ def create_app():
 
     @app.get("/api/engines")
     def engines():
-        return {"engines": ENGINE_NAMES, "default": DEFAULT_ENGINE, "formats": OUTPUT_FORMATS}
+        default, _reason = resolve_default_engine()
+        items = []
+        for name in ENGINE_NAMES:
+            available, note = engine_availability(name)
+            items.append({"name": name, "available": available, "note": note})
+        return {"engines": items, "default": default, "formats": OUTPUT_FORMATS}
 
     @app.post("/api/jobs")
     async def create_job(
         language: str = Form(DEFAULT_LANGUAGE),
         format: str = Form("txt"),
-        engine: str = Form(DEFAULT_ENGINE),
+        engine: str | None = Form(None),
         url: str | None = Form(None),
         file: UploadFile | None = File(None),
     ):
         fmt = (format or "txt").lower()
         if fmt not in OUTPUT_FORMATS:
             raise HTTPException(400, f'Unknown format "{fmt}"')
+        engine = engine or resolve_default_engine()[0]
         if engine not in ENGINE_NAMES:
             raise HTTPException(400, f'Unknown engine "{engine}"')
 
@@ -226,7 +232,8 @@ def main():
 
     ensure_dirs()
     port = int(os.environ.get("PORT") or 8000)
-    print(f"🌐 Transcriber API on http://127.0.0.1:{port}  (engine: {DEFAULT_ENGINE})")
+    default_engine, _reason = resolve_default_engine()
+    print(f"🌐 Transcriber API on http://127.0.0.1:{port}  (default engine: {default_engine})")
     uvicorn.run(create_app(), host="127.0.0.1", port=port)
 
 

@@ -24,7 +24,11 @@ stitching everything back into a single clean transcript.
 | Size limit | 25 MB (auto compress/split) | None |
 | Speed | Very fast | Depends on CPU/GPU; model loads once and is reused |
 
-Pick per run with `--engine`, or set a default with `TRANSCRIBER_ENGINE`.
+Pick per run with `--engine`, or set a default with `TRANSCRIBER_ENGINE`. If you
+set neither, the engine is auto-resolved once (never per file): a present
+`GROQ_API_KEY` means cloud; otherwise the offline engine is used if installed.
+The chosen engine and the reason are printed at startup, so it's never a silent
+surprise.
 
 ## Requirements
 
@@ -107,10 +111,10 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 | --- | --- |
 | `-f, --format <fmt>` | `txt` (default), `srt`, `vtt`, or `json`. |
 | `-o, --out <dir>` | Output directory (default: `transcripts/`). |
-| `-e, --engine <name>` | `groq` (cloud, default) or `local` (offline). |
+| `-e, --engine <name>` | `groq` (cloud) or `local` (offline); auto-resolved if omitted. |
 | `--keep` | Keep the downloaded audio (stays in `downloads/`). |
 | `-i, --interactive` | Prompt for the URL and language step by step. |
-| `TRANSCRIBER_ENGINE` | Default engine when `--engine` is omitted. |
+| `TRANSCRIBER_ENGINE` | Force the default engine; if unset it's auto-resolved from your config. |
 | `GROQ_API_KEY` | Groq API key (cloud engine). |
 | `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
 | `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3`). |

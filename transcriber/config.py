@@ -16,7 +16,8 @@ DIRS = {
 }
 
 # Transcription engine: "groq" (cloud API) or "local" (offline faster-whisper).
-DEFAULT_ENGINE = os.environ.get("TRANSCRIBER_ENGINE", "groq")
+# When TRANSCRIBER_ENGINE is unset the default is resolved at runtime from what's
+# configured — see transcriber.engines.resolve_default_engine.
 
 # Groq caps uploads at 25 MB; stay just under to leave headroom.
 MAX_FILE_SIZE_MB = 24

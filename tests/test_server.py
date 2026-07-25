@@ -36,8 +36,11 @@ def client(monkeypatch):
 
 def test_engines_endpoint(client):
     body = client.get("/api/engines").json()
-    assert "groq" in body["engines"]
+    names = [e["name"] for e in body["engines"]]
+    assert "groq" in names
+    assert all("available" in e for e in body["engines"])
     assert "json" in body["formats"]
+    assert body["default"] in names
 
 
 def test_create_job_requires_input(client):
