@@ -25,10 +25,10 @@ stitching everything back into a single clean transcript.
 | Speed | Very fast | Depends on CPU/GPU; model loads once and is reused |
 
 Pick per run with `--engine`, or set a default with `TRANSCRIBER_ENGINE`. If you
-set neither, the engine is auto-resolved once (never per file): a present
-`GROQ_API_KEY` means cloud; otherwise the offline engine is used if installed.
-The chosen engine and the reason are printed at startup, so it's never a silent
-surprise.
+set neither, the engine is auto-resolved once (never per file): a Groq key (set
+in the web **Settings** or via the `GROQ_API_KEY` env var) means cloud; otherwise
+the offline engine is used if installed. The chosen engine and the reason are
+printed at startup, so it's never a silent surprise.
 
 ## Requirements
 
@@ -58,12 +58,9 @@ pip install ".[server]"             # web UI backend
 pip install ".[local,server,dev]"   # everything + test tools
 ```
 
-Then copy the env template and add your Groq key (for the cloud engine):
-
-```bash
-cp .env.example .env
-# GROQ_API_KEY=gsk_...   → https://console.groq.com/keys
-```
+For the cloud engine you need a free Groq key: enter it in the web UI
+**Settings**, or (for the CLI) set the `GROQ_API_KEY` env var. Get one at
+https://console.groq.com/keys.
 
 ## Command-line usage
 
