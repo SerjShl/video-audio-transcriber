@@ -228,7 +228,5 @@ export function getInitialUiLang(): UiLang {
   } catch {
     /* ignore */
   }
-  return typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("ru")
-    ? "ru"
-    : "en";
+  return "ru"; // default to Russian; the switcher remembers any change
 }

@@ -100,9 +100,6 @@ transcriber-server        # or: python -m backend.server
 # → http://127.0.0.1:8000
 ```
 
-On Windows, double-clicking **`Transcriber.bat`** starts the server and opens
-the browser for you — no terminal needed.
-
 For frontend development with hot reload, run the backend and `npm run dev` in
 `frontend/` (it proxies `/api` to the backend). See `frontend/README.md`.
 
@@ -122,9 +119,14 @@ expose the local server with [Tailscale Funnel](https://tailscale.com/kb/1223/fu
 
 1. Install Tailscale (https://tailscale.com/download/windows) and sign in once.
 2. In the admin console enable **MagicDNS + HTTPS** and allow **Funnel**.
-3. Double-click **`Transcriber-online.bat`** — it starts the server and prints a
-   public `https://<machine>.<tailnet>.ts.net` URL. Share that URL.
-4. Make sure `APP_PASSWORD` is set (it gates the public link).
+3. Run `powershell -ExecutionPolicy Bypass -File Install-Autostart.ps1`. It
+   starts the server hidden at every login and publishes it via a persisted
+   Tailscale Funnel, printing a public `https://<machine>.<tailnet>.ts.net` URL.
+4. Make sure `APP_PASSWORD` is set — the URL is public, so the password is its
+   only protection.
+
+To undo: delete `Transcriber.vbs` from the Startup folder and run
+`tailscale serve reset`.
 
 The link only works while your PC is on and the funnel is running, so keep
 Render as the always-on fallback for when the machine is asleep.
