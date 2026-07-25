@@ -1,6 +1,5 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-python -m transcriber.cli --interactive
-echo.
+python -m transcriber.server
 pause

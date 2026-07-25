@@ -1,0 +1,39 @@
+[project]
+name = "video-audio-transcriber"
+version = "2.0.0"
+description = "Transcribe videos from a URL (YouTube and hundreds of other sites) or local audio/video files, in the cloud (Groq Whisper) or fully offline (faster-whisper)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "SerjShl" }]
+dependencies = [
+    "groq>=0.11",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Offline engine — heavier (CTranslate2 + model download), so it's opt-in.
+local = ["faster-whisper>=1.0"]
+# Web UI backend.
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.scripts]
+transcribe = "transcriber.cli:main"
+transcriber-server = "transcriber.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["transcriber*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# FastAPI idiomatically uses callables (Form/File) as argument defaults.
+ignore = ["B008"]
