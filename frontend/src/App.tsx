@@ -4,36 +4,25 @@ import {
   Cookie,
   Copy,
   Download,
-  ExternalLink,
   FileAudio,
-  HelpCircle,
-  Languages,
-  KeyRound,
   Link2,
   Loader2,
-  Lock,
   LogOut,
   Moon,
   Radio,
-  RefreshCw,
   Settings2,
   Sun,
-  Trash2,
   Upload,
   X,
 } from "lucide-react";
 import { type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 
+import { LoginScreen } from "@/components/LoginScreen";
+import { SettingsDialog } from "@/components/SettingsDialog";
+import { Waveform } from "@/components/Waveform";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,69 +34,22 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULTS, MODE, MODES, STORAGE_KEYS } from "@/constants";
+import { usePersistentState } from "@/hooks/usePersistentState";
+import { useTranscriber } from "@/hooks/useTranscriber";
+import { STRINGS, type UiLang, getInitialUiLang } from "@/i18n";
+import { formatBytes, formatElapsed } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { STRINGS, UI_LANGS, UI_LANG_KEY, type UiLang, getInitialUiLang } from "@/i18n";
+import type { Cookies, EngineInfo } from "@/types";
 
-type Status = "idle" | "running" | "done" | "error";
-type Result = { text: string; filename: string; format: string };
-type EngineInfo = { name: string; available: boolean; note: string };
-type Cookies = { present: boolean; name: string | null };
-
-// Spoken languages Whisper listens for (labels come from the UI locale).
 const SPOKEN_CODES = ["ru", "en"];
-
 const FORMAT_ORDER = ["txt", "docx", "pdf", "srt", "vtt", "json"];
 
-function formatBytes(n: number) {
-  if (n < 1024) return `${n} B`;
-  const kb = n / 1024;
-  if (kb < 1024) return `${Math.round(kb)} KB`;
-  const mb = kb / 1024;
-  if (mb < 1024) return `${mb.toFixed(1)} MB`;
-  return `${(mb / 1024).toFixed(2)} GB`;
-}
-
-function formatElapsed(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-// Turn the pipeline's raw stdout lines into one friendly status label.
-function deriveStage(logs: string[], strings: (typeof STRINGS)["ru"]) {
-  for (let i = logs.length - 1; i >= 0; i--) {
-    const line = logs[i].toLowerCase();
-    const part = line.match(/part\s+(\d+)\/(\d+)/);
-    if (part) return strings.statusPart.replace("{n}", part[1]).replace("{total}", part[2]);
-    if (line.includes("transcrib") || line.includes("🎤")) return strings.statusTranscribing;
-    if (line.includes("loading local model") || line.includes("📦")) return strings.statusModel;
-    if (line.includes("compress")) return strings.statusCompressing;
-    if (line.includes("split")) return strings.statusSplitting;
-    if (line.includes("download") || line.includes("⬇")) return strings.statusDownloading;
-  }
-  return strings.statusPreparing;
-}
-
-function Waveform({ bars = 5, className }: { bars?: number; className?: string }) {
-  return (
-    <span className={cn("inline-flex items-end gap-[3px]", className)} aria-hidden>
-      {Array.from({ length: bars }).map((_, i) => (
-        <span
-          key={i}
-          className="w-[3px] rounded-full bg-current animate-wave"
-          style={{ height: "0.9rem", animationDelay: `${i * 0.11}s` }}
-        />
-      ))}
-    </span>
-  );
-}
-
 export default function App() {
-  const [dark, setDark] = useState(() => localStorage.getItem("vat_dark") !== "0");
   const [uiLang, setUiLang] = useState<UiLang>(getInitialUiLang);
   const t = STRINGS[uiLang];
+  const [dark, setDark] = useState(() => localStorage.getItem(STORAGE_KEYS.dark) !== "0");
 
-  // --- auth ---
   const [authChecked, setAuthChecked] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [authed, setAuthed] = useState(false);
@@ -115,7 +57,6 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
 
-  // --- settings ---
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cookies, setCookies] = useState<Cookies>({ present: false, name: null });
   const [cookiesBusy, setCookiesBusy] = useState(false);
@@ -123,97 +64,43 @@ export default function App() {
   const [groqKeyInput, setGroqKeyInput] = useState("");
   const [groqBusy, setGroqBusy] = useState(false);
 
-  // --- form ---
-  const [mode, setMode] = useState<"url" | "file">(() =>
-    localStorage.getItem("vat_mode") === "file" ? "file" : "url",
-  );
+  const [mode, setMode] = usePersistentState(STORAGE_KEYS.mode, DEFAULTS.mode, MODES);
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
-
-  const [language, setLanguage] = useState(() => localStorage.getItem("vat_language") || "ru");
-  const [format, setFormat] = useState(() => localStorage.getItem("vat_format") || "txt");
-  const [engine, setEngine] = useState(() => localStorage.getItem("vat_engine") || "groq");
+  const [language, setLanguage] = usePersistentState(STORAGE_KEYS.language, DEFAULTS.language);
+  const [format, setFormat] = usePersistentState(STORAGE_KEYS.format, DEFAULTS.format);
+  const [engine, setEngine] = usePersistentState(STORAGE_KEYS.engine, DEFAULTS.engine);
   const [engines, setEngines] = useState<EngineInfo[]>([
     { name: "groq", available: true, note: "" },
   ]);
   const [formats, setFormats] = useState<string[]>(["txt", "srt", "vtt", "json", "docx", "pdf"]);
 
-  // --- job ---
-  const [status, setStatus] = useState<Status>("idle");
-  const [logs, setLogs] = useState<string[]>([]);
-  const [result, setResult] = useState<Result | null>(null);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const job = useTranscriber(t);
   const [copied, setCopied] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-
-  const esRef = useRef<EventSource | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     try {
-      localStorage.setItem("vat_dark", dark ? "1" : "0");
+      localStorage.setItem(STORAGE_KEYS.dark, dark ? "1" : "0");
     } catch {
-      /* ignore */
+      return;
     }
   }, [dark]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("vat_mode", mode);
-    } catch {
-      /* ignore */
-    }
-  }, [mode]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("vat_engine", engine);
-    } catch {
-      /* ignore */
-    }
-  }, [engine]);
-
-  useEffect(() => {
     document.documentElement.lang = uiLang;
     try {
-      localStorage.setItem(UI_LANG_KEY, uiLang);
+      localStorage.setItem(STORAGE_KEYS.uiLang, uiLang);
     } catch {
-      /* ignore */
+      return;
     }
   }, [uiLang]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("vat_language", language);
-    } catch {
-      /* ignore */
-    }
-  }, [language]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("vat_format", format);
-    } catch {
-      /* ignore */
-    }
-  }, [format]);
-
-  // Elapsed timer while a job runs.
-  useEffect(() => {
-    if (status !== "running") return;
-    setElapsed(0);
-    const id = window.setInterval(() => setElapsed((e) => e + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [status]);
-
-  useEffect(() => () => esRef.current?.close(), []);
+  }, [job.logs]);
 
   function loadEngines() {
     fetch("/api/engines")
@@ -222,9 +109,10 @@ export default function App() {
         if (!d) return;
         setEngines(d.engines);
         setFormats(d.formats);
-        // Restore the last engine if it's still available; else server default.
-        const saved = localStorage.getItem("vat_engine");
-        const available = d.engines.filter((e: EngineInfo) => e.available).map((e: EngineInfo) => e.name);
+        const saved = localStorage.getItem(STORAGE_KEYS.engine);
+        const available = d.engines
+          .filter((e: EngineInfo) => e.available)
+          .map((e: EngineInfo) => e.name);
         setEngine(saved && available.includes(saved) ? saved : d.default);
       })
       .catch(() => {});
@@ -240,41 +128,6 @@ export default function App() {
         if (d.cookies) setCookies(d.cookies);
       })
       .catch(() => {});
-  }
-
-  async function saveGroqKey() {
-    setGroqBusy(true);
-    try {
-      const res = await fetch("/api/groq-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: groqKeyInput.trim() }),
-      });
-      if (res.ok) {
-        setGroqKeySet(Boolean((await res.json()).groqKeySet));
-        setGroqKeyInput("");
-        loadEngines(); // groq becomes available/unavailable
-      }
-    } finally {
-      setGroqBusy(false);
-    }
-  }
-
-  async function clearGroqKey() {
-    setGroqBusy(true);
-    try {
-      const res = await fetch("/api/groq-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "" }),
-      });
-      if (res.ok) {
-        setGroqKeySet(false);
-        loadEngines();
-      }
-    } finally {
-      setGroqBusy(false);
-    }
   }
 
   useEffect(() => {
@@ -323,13 +176,44 @@ export default function App() {
 
   async function logout() {
     await fetch("/api/logout", { method: "POST" }).catch(() => {});
-    esRef.current?.close();
+    job.reset();
     setAuthed(false);
     setSettingsOpen(false);
-    setStatus("idle");
-    setResult(null);
-    setLogs([]);
-    setError(null);
+  }
+
+  async function saveGroqKey() {
+    setGroqBusy(true);
+    try {
+      const res = await fetch("/api/groq-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: groqKeyInput.trim() }),
+      });
+      if (res.ok) {
+        setGroqKeySet(Boolean((await res.json()).groqKeySet));
+        setGroqKeyInput("");
+        loadEngines();
+      }
+    } finally {
+      setGroqBusy(false);
+    }
+  }
+
+  async function clearGroqKey() {
+    setGroqBusy(true);
+    try {
+      const res = await fetch("/api/groq-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "" }),
+      });
+      if (res.ok) {
+        setGroqKeySet(false);
+        loadEngines();
+      }
+    } finally {
+      setGroqBusy(false);
+    }
   }
 
   async function uploadCookies(f: File | null) {
@@ -355,68 +239,18 @@ export default function App() {
     }
   }
 
-  const running = status === "running";
-  const canSubmit = running ? false : mode === "url" ? url.trim().length > 0 : file !== null;
+  const running = job.running;
+
+  function canSubmit(): boolean {
+    if (running) return false;
+    if (mode === MODE.url) return url.trim().length > 0;
+    return file !== null;
+  }
+
   const orderedFormats = [
     ...FORMAT_ORDER.filter((f) => formats.includes(f)),
     ...formats.filter((f) => !FORMAT_ORDER.includes(f)),
   ];
-  // Only offer an engine choice when more than one actually works here (e.g.
-  // locally). In the cloud only Groq is installed, so the picker is hidden.
-  const availableEngines = engines.filter((e) => e.available);
-
-  async function start() {
-    setStatus("running");
-    setLogs([]);
-    setResult(null);
-    setJobId(null);
-    setError(null);
-
-    const body = new FormData();
-    body.append("language", language);
-    body.append("format", format);
-    body.append("engine", engine);
-    if (mode === "url") {
-      body.append("url", url.trim());
-    } else if (file) {
-      body.append("file", file);
-    }
-
-    try {
-      const res = await fetch("/api/jobs", { method: "POST", body });
-      if (!res.ok) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail.detail || `${t.errorTitle} (${res.status})`);
-      }
-      const { jobId } = await res.json();
-      setJobId(jobId);
-
-      const es = new EventSource(`/api/jobs/${jobId}/events`);
-      esRef.current = es;
-      es.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === "log") {
-          setLogs((prev) => [...prev, data.line]);
-        } else if (data.type === "done") {
-          setResult(data.result);
-          setStatus("done");
-          es.close();
-        } else if (data.type === "error") {
-          setError(data.message);
-          setStatus("error");
-          es.close();
-        }
-      };
-      es.onerror = () => {
-        es.close();
-        setStatus((s) => (s === "done" ? s : "error"));
-        setError((e) => e ?? (uiLang === "ru" ? "Соединение с сервером потеряно" : "Lost connection to the server"));
-      };
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setStatus("error");
-    }
-  }
 
   function onDrop(e: DragEvent) {
     e.preventDefault();
@@ -426,33 +260,16 @@ export default function App() {
   }
 
   function copyResult() {
-    if (!result) return;
-    navigator.clipboard.writeText(result.text);
+    if (!job.result) return;
+    navigator.clipboard.writeText(job.result.text);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
 
   function downloadResult() {
-    if (jobId) window.location.href = `/api/jobs/${jobId}/download`;
+    if (job.jobId) window.location.href = `/api/jobs/${job.jobId}/download`;
   }
 
-  const uiLangSwitcher = (
-    <Select value={uiLang} onValueChange={(v) => setUiLang(v as UiLang)}>
-      <SelectTrigger className="h-8 w-auto gap-1 border-0 bg-transparent px-2 text-xs shadow-none hover:bg-accent focus:ring-0">
-        <Languages className="h-4 w-4" />
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {UI_LANGS.map((l) => (
-          <SelectItem key={l.code} value={l.code}>
-            {l.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-
-  // --- gate: still checking -------------------------------------------------
   if (!authChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -461,52 +278,24 @@ export default function App() {
     );
   }
 
-  // --- gate: login screen ---------------------------------------------------
   if (authRequired && !authed) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm animate-fade-up">
-          <div className="mb-8 flex flex-col items-center text-center">
-            <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">
-              <Radio className="h-7 w-7" />
-            </div>
-            <h1 className="font-display text-2xl font-bold tracking-tight">Transcriber</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t.loginSubtitle}</p>
-          </div>
-          <div className="glass rounded-2xl border p-6 shadow-lift">
-            <form onSubmit={submitLogin} className="flex flex-col gap-3">
-              <Label className="eyebrow flex items-center gap-1.5">
-                <Lock className="h-3 w-3" /> {t.loginPasswordLabel}
-              </Label>
-              <Input
-                type="password"
-                autoFocus
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 text-center tracking-widest"
-              />
-              {loginError && (
-                <p className="flex items-center gap-1.5 text-sm text-destructive">
-                  <AlertCircle className="h-4 w-4" /> {loginError}
-                </p>
-              )}
-              <Button type="submit" size="lg" disabled={loggingIn || !password} className="mt-1 w-full">
-                {loggingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : t.loginSubmit}
-              </Button>
-            </form>
-          </div>
-          <div className="mt-4 flex justify-center">{uiLangSwitcher}</div>
-        </div>
-      </div>
+      <LoginScreen
+        t={t}
+        password={password}
+        onPasswordChange={setPassword}
+        onSubmit={submitLogin}
+        error={loginError}
+        submitting={loggingIn}
+        uiLang={uiLang}
+        onUiLang={setUiLang}
+      />
     );
   }
 
-  // --- main app -------------------------------------------------------------
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8 md:py-12">
-        {/* Header */}
         <header className="flex items-center justify-between animate-fade-up">
           <div className="flex items-center gap-3">
             <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">
@@ -535,7 +324,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Console */}
         <Card className="glass border shadow-lift animate-fade-up" style={{ animationDelay: "0.06s" }}>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -546,7 +334,7 @@ export default function App() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
-            <Tabs value={mode} onValueChange={(v) => setMode(v as "url" | "file")}>
+            <Tabs value={mode} onValueChange={setMode}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="url" className="gap-2">
                   <Link2 className="h-4 w-4" /> {t.tabLink}
@@ -656,7 +444,12 @@ export default function App() {
               </div>
             </div>
 
-            <Button onClick={start} disabled={!canSubmit} size="lg" className="h-12 w-full text-[0.95rem] font-semibold">
+            <Button
+              onClick={() => job.start({ mode, url, file, language, format, engine })}
+              disabled={!canSubmit()}
+              size="lg"
+              className="h-12 w-full text-[0.95rem] font-semibold"
+            >
               {running ? (
                 <>
                   <Waveform className="text-primary-foreground" /> {t.transcribing}
@@ -670,8 +463,7 @@ export default function App() {
           </CardContent>
         </Card>
 
-        {/* Progress */}
-        {(running || logs.length > 0) && (
+        {(running || job.logs.length > 0) && (
           <Card className="glass border animate-fade-up">
             <CardContent className="flex flex-col gap-3 py-5">
               <div className="flex items-center gap-3">
@@ -681,22 +473,22 @@ export default function App() {
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
                 )}
                 <span className="flex-1 text-sm font-medium">
-                  {running ? deriveStage(logs, t) : t.progress}
+                  {running ? job.stage : t.progress}
                 </span>
                 {running && (
                   <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    {formatElapsed(elapsed)}
+                    {formatElapsed(job.elapsed)}
                   </span>
                 )}
               </div>
               {running && <p className="text-xs text-muted-foreground/80">{t.largeFileHint}</p>}
-              {logs.length > 0 && (
+              {job.logs.length > 0 && (
                 <details>
                   <summary className="cursor-pointer text-xs text-muted-foreground transition-colors hover:text-foreground">
                     {t.showLog}
                   </summary>
                   <div className="mt-2 max-h-48 overflow-y-auto rounded-xl bg-background/60 p-3 font-mono text-[11px] leading-relaxed">
-                    {logs.map((line, i) => (
+                    {job.logs.map((line, i) => (
                       <div key={i} className="whitespace-pre-wrap text-muted-foreground">
                         {line}
                       </div>
@@ -709,26 +501,24 @@ export default function App() {
           </Card>
         )}
 
-        {/* Error */}
-        {error && (
+        {job.error && (
           <Card className="border-destructive/50 bg-destructive/5 animate-fade-up">
             <CardContent className="flex items-start gap-3 py-4 text-sm">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
               <div>
                 <p className="font-medium text-destructive">{t.errorTitle}</p>
-                <p className="text-muted-foreground">{error}</p>
+                <p className="text-muted-foreground">{job.error}</p>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Result */}
-        {result && (
+        {job.result && (
           <Card className="glass border shadow-lift animate-fade-up">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="flex items-center gap-2 text-base font-medium">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                <span className="truncate">{result.filename}</span>
+                <span className="truncate">{job.result.filename}</span>
               </CardTitle>
               <div className="flex shrink-0 gap-2">
                 <Button variant="outline" size="sm" onClick={copyResult}>
@@ -743,7 +533,7 @@ export default function App() {
             <CardContent>
               <Textarea
                 readOnly
-                value={result.text}
+                value={job.result.text}
                 className="min-h-[240px] resize-y bg-background/60 font-mono text-sm leading-relaxed"
               />
             </CardContent>
@@ -753,173 +543,26 @@ export default function App() {
         <footer className="pt-2 text-center text-xs text-muted-foreground/60">{t.footer}</footer>
       </div>
 
-      {/* Settings dialog */}
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-primary" /> {t.settingsTitle}
-            </DialogTitle>
-            <DialogDescription>{t.settingsDesc}</DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-5 pt-1">
-            {/* Interface language */}
-            <section className="rounded-xl border bg-background/50 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Languages className="h-4 w-4 text-primary" />
-                <span className="eyebrow">{t.uiLangEyebrow}</span>
-              </div>
-              <Select value={uiLang} onValueChange={(v) => setUiLang(v as UiLang)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UI_LANGS.map((l) => (
-                    <SelectItem key={l.code} value={l.code}>
-                      {l.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </section>
-
-            {/* Groq API key */}
-            <section className="rounded-xl border bg-background/50 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-primary" />
-                <span className="eyebrow">{t.groqEyebrow}</span>
-              </div>
-              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t.groqDesc}</p>
-              {groqKeySet ? (
-                <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2">
-                  <span className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                    {t.groqSaved}
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={clearGroqKey} disabled={groqBusy}>
-                    <Trash2 className="h-4 w-4" /> {t.groqRemove}
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder={t.groqPlaceholder}
-                    value={groqKeyInput}
-                    onChange={(e) => setGroqKeyInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveGroqKey();
-                    }}
-                  />
-                  <Button onClick={saveGroqKey} disabled={groqBusy || !groqKeyInput.trim()}>
-                    {groqBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : t.groqSave}
-                  </Button>
-                </div>
-              )}
-              <a
-                href="https://console.groq.com/keys"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                {t.groqGetKey} <ExternalLink className="h-3 w-3" />
-              </a>
-            </section>
-
-            {/* Recognition mode — shown only when more than one engine works here */}
-            {availableEngines.length > 1 && (
-              <section className="rounded-xl border bg-background/50 p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-primary" />
-                  <span className="eyebrow">{t.modeEyebrow}</span>
-                </div>
-                <Select value={engine} onValueChange={setEngine}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableEngines.map((e) => (
-                      <SelectItem key={e.name} value={e.name}>
-                        {t.engineLabels[e.name] ?? e.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t.modeNote}</p>
-              </section>
-            )}
-
-            {/* Cookies */}
-            <section className="rounded-xl border bg-background/50 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <Cookie className="h-4 w-4 text-primary" />
-                <span className="eyebrow">{t.cookiesEyebrow}</span>
-              </div>
-              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t.cookiesDesc}</p>
-
-              {cookies.present ? (
-                <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2">
-                  <span className="flex items-center gap-2 truncate text-sm">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate">
-                      {cookies.name} · {t.cookiesConnected}
-                    </span>
-                  </span>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <label className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                      <RefreshCw className="h-3.5 w-3.5" /> {t.cookiesReplace}
-                      <input
-                        type="file"
-                        accept=".txt"
-                        className="hidden"
-                        disabled={cookiesBusy}
-                        onChange={(e) => uploadCookies(e.target.files?.[0] ?? null)}
-                      />
-                    </label>
-                    <Button variant="ghost" size="sm" onClick={clearCookies} disabled={cookiesBusy}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-sm text-muted-foreground transition-colors hover:bg-accent/40">
-                  {cookiesBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {t.cookiesUpload}
-                  <input
-                    type="file"
-                    accept=".txt"
-                    className="hidden"
-                    disabled={cookiesBusy}
-                    onChange={(e) => uploadCookies(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              )}
-
-              <details className="mt-3">
-                <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-primary">
-                  <HelpCircle className="h-3.5 w-3.5" /> {t.cookiesGuide}
-                </summary>
-                <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground">
-                  <li>{t.cookiesStep1}</li>
-                  <li>{t.cookiesStep2}</li>
-                  <li>{t.cookiesStep3}</li>
-                  <li>{t.cookiesStep4}</li>
-                  <li>{t.cookiesStep5}</li>
-                </ol>
-                <a
-                  href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  {t.cookiesStoreLink} <ExternalLink className="h-3 w-3" />
-                </a>
-              </details>
-            </section>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        t={t}
+        uiLang={uiLang}
+        onUiLang={setUiLang}
+        engines={engines}
+        engine={engine}
+        onEngine={setEngine}
+        groqKeySet={groqKeySet}
+        groqKeyInput={groqKeyInput}
+        onGroqKeyInput={setGroqKeyInput}
+        groqBusy={groqBusy}
+        onSaveGroqKey={saveGroqKey}
+        onClearGroqKey={clearGroqKey}
+        cookies={cookies}
+        cookiesBusy={cookiesBusy}
+        onUploadCookies={uploadCookies}
+        onClearCookies={clearCookies}
+      />
     </div>
   );
 }

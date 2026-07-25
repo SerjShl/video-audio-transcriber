@@ -1,15 +1,19 @@
-// Lightweight UI internationalisation. The transcription content language
-// (what Whisper listens for) is separate — this only translates the interface.
+import { STORAGE_KEYS } from "@/constants";
 
 export type UiLang = "ru" | "en";
+
+export function toUiLang(value: string): UiLang {
+  return value === "en" ? "en" : "ru";
+}
 
 export const UI_LANGS: { code: UiLang; label: string }[] = [
   { code: "ru", label: "Русский" },
   { code: "en", label: "English" },
 ];
 
-type Strings = {
+export type Strings = {
   tagline: string;
+  connectionLost: string;
   a11ySettings: string;
   a11yTheme: string;
   a11yLogout: string;
@@ -77,6 +81,7 @@ type Strings = {
 export const STRINGS: Record<UiLang, Strings> = {
   ru: {
     tagline: "Расшифровка видео и аудио в текст",
+    connectionLost: "Соединение с сервером потеряно",
     a11ySettings: "Настройки",
     a11yTheme: "Тема",
     a11yLogout: "Выйти",
@@ -127,7 +132,7 @@ export const STRINGS: Record<UiLang, Strings> = {
       "«Онлайн» работает через облако и быстрее. «На устройстве» медленнее, зато запись никуда не отправляется.",
     cookiesEyebrow: "YouTube cookies",
     cookiesDesc:
-      "Нужны, только если YouTube просит подтвердить, что вы не робот. Загрузите cookies.txt один раз — он хранится на сервере и применяется ко всем загрузкам по ссылке, поэтому остальным ничего настраивать не нужно.",
+      "Нужны, только если YouTube просит подтвердить, что вы не робот. Загрузите cookies.txt — он хранится локально на этом компьютере и используется для загрузок по ссылке.",
     cookiesConnected: "подключён",
     cookiesReplace: "Заменить",
     cookiesUpload: "Загрузить cookies.txt",
@@ -152,6 +157,7 @@ export const STRINGS: Record<UiLang, Strings> = {
   },
   en: {
     tagline: "Turn video and audio into text",
+    connectionLost: "Lost connection to the server",
     a11ySettings: "Settings",
     a11yTheme: "Theme",
     a11yLogout: "Log out",
@@ -202,7 +208,7 @@ export const STRINGS: Record<UiLang, Strings> = {
       "\"Online\" runs in the cloud and is faster. \"On device\" is slower but nothing leaves your machine.",
     cookiesEyebrow: "YouTube cookies",
     cookiesDesc:
-      "Only needed when YouTube asks you to confirm you're not a bot. Upload cookies.txt once — it's stored on the server and used for every link, so nobody else has to set anything up.",
+      "Only needed when YouTube asks you to confirm you're not a bot. Upload cookies.txt — it's stored locally on this computer and used for link downloads.",
     cookiesConnected: "connected",
     cookiesReplace: "Replace",
     cookiesUpload: "Upload cookies.txt",
@@ -227,14 +233,12 @@ export const STRINGS: Record<UiLang, Strings> = {
   },
 };
 
-export const UI_LANG_KEY = "vat_ui_lang_v2";
-
 export function getInitialUiLang(): UiLang {
   try {
-    const saved = localStorage.getItem(UI_LANG_KEY);
+    const saved = localStorage.getItem(STORAGE_KEYS.uiLang);
     if (saved === "ru" || saved === "en") return saved;
   } catch {
-    /* ignore */
+    return "ru";
   }
-  return "ru"; // default to Russian; the switcher remembers any change
+  return "ru";
 }
