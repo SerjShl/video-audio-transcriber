@@ -70,7 +70,7 @@ cp .env.example .env
 ```bash
 transcribe <URL> [language] [options]
 transcribe <file path> [language] [options]
-transcribe scan [language] [options]     # every file in input/
+transcribe scan [language] [options]     # every file in data/input/
 transcribe --interactive                 # prompt step by step
 ```
 
@@ -86,8 +86,6 @@ transcribe scan ru --out ./subs
 transcribe ./private.mp4 ru --engine local      # offline, nothing uploaded
 ```
 
-`start.sh` / `start.bat` launch interactive mode with a double-click.
-
 ## Web UI
 
 A modern UI (Vite + React + [shadcn/ui](https://ui.shadcn.com)) that talks to a
@@ -98,7 +96,7 @@ FastAPI backend, with live progress and copy/download of the result.
 cd frontend && npm install && npm run build && cd ..
 
 # 2. run the server (serves the built UI + API)
-transcriber-server        # or: python -m transcriber.server  ·  or web.sh / web.bat
+transcriber-server        # or: python -m backend.server
 # → http://127.0.0.1:8000
 ```
 
@@ -109,19 +107,23 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 
 | Option | Description |
 | --- | --- |
-| `-f, --format <fmt>` | `txt` (default), `srt`, `vtt`, or `json`. |
-| `-o, --out <dir>` | Output directory (default: `transcripts/`). |
+| `-f, --format <fmt>` | `txt` (default), `srt`, `vtt`, `json`, `docx`, or `pdf`. |
+| `-o, --out <dir>` | Output directory (default: `data/transcripts/`). |
 | `-e, --engine <name>` | `groq` (cloud) or `local` (offline); auto-resolved if omitted. |
-| `--keep` | Keep the downloaded audio (stays in `downloads/`). |
+| `--keep` | Keep the downloaded audio (stays in `data/downloads/`). |
 | `-i, --interactive` | Prompt for the URL and language step by step. |
 | `TRANSCRIBER_ENGINE` | Force the default engine; if unset it's auto-resolved from your config. |
 | `GROQ_API_KEY` | Groq API key (cloud engine). |
 | `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
 | `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3`). |
 | `WHISPER_DEVICE` | `auto` / `cpu` / `cuda` for the local engine. |
-| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot". |
+| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). In the web UI each user uploads their own `cookies.txt` per link. |
 | `SCAN_CONCURRENCY` | Parallel files in `scan` mode (default 3). |
-| `PORT` | Web server port (default 8000). |
+| `PORT` | Web server port (default 8000; injected by most PaaS). |
+| `HOST` | Bind address (default `127.0.0.1`; use `0.0.0.0` in a container). |
+| `APP_PASSWORD` | Shared password for the web UI login page. Unset = open; set it on any public deployment. |
+| `SESSION_SECRET` | Optional key for signing the login cookie (defaults to `APP_PASSWORD`). |
+| `PDF_FONT` | Optional path to a Unicode `.ttf` for PDF export (a system font is used otherwise). |
 
 ## How it works
 
@@ -132,15 +134,81 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 3. **Transcribe** — send each chunk to the selected engine, retrying transient
    failures (cloud) with exponential backoff.
 4. **Format** — merge segments into readable paragraphs, subtitle cues, or JSON,
-   and save the transcript to `transcripts/`.
+   and save the transcript to `data/transcripts/`.
+
+## Run your own copy (free hosting)
+
+Anyone can fork this repo and stand up their own private instance — no code
+changes required. The repo ships a `Dockerfile` and a Render `render.yaml`
+configured for the **cloud (Groq) engine** (the only one that fits a free
+tier). The image builds the React UI, installs ffmpeg + yt-dlp, and serves the
+whole app from one port, behind a password you choose.
+
+**What you need (both free):**
+1. A [GitHub](https://github.com/) account — to fork the repo.
+2. A [Groq API key](https://console.groq.com/keys) — sign up, create a key
+   (`gsk_...`). This is what does the transcription.
+
+**Deploy on [Render](https://render.com) (~5 minutes):**
+1. **Fork** this repo to your own GitHub account (top-right *Fork* button).
+2. On Render: **New → Blueprint**, connect GitHub, and pick your fork. Render
+   reads `render.yaml` and creates the service automatically.
+3. Open the new service → **Environment**, and add two values:
+   - `GROQ_API_KEY` — the key from step 2 above.
+   - `APP_PASSWORD` — a password you invent. Everyone who uses your instance
+     will type it once.
+4. Wait for the first build to finish, then open the service URL. A login page
+   asks for the password, and you're in.
+5. Share the URL **and** the password with the people you want to let in.
+
+Once inside: pick a language (Русский/English), a format (txt/srt/vtt/json/docx/pdf),
+paste a link or drop a file, and hit transcribe. The **Settings** dialog (gear
+icon) has two controls:
+- **YouTube cookies** — a single shared `cookies.txt`, uploaded once and stored
+  on the server, then used automatically for every URL job. So one person sets
+  it up and everyone else (family included) never touches cookies. See
+  [Getting a cookies.txt](#getting-a-cookiestxt) below.
+- **Require password to enter** — toggle the login gate on/off at runtime
+  (stored in `data/settings.json`; on Render's ephemeral disk it resets to the
+  `APP_PASSWORD`-based default after a restart).
+
+### Getting a cookies.txt
+
+Only needed when YouTube answers a download with "confirm you're not a bot"
+(more common from a cloud server than from home). To create one:
+
+1. Install the **"Get cookies.txt LOCALLY"** browser extension (Chrome/Edge/Firefox).
+2. Open `youtube.com` and sign in.
+3. Click the extension → **Export** — it downloads `cookies.txt`.
+4. Upload it in **Settings → YouTube cookies**. Refresh every couple of months
+   or whenever downloads start failing again.
+
+> Prefer one click? This button deploys the canonical repo directly (you still
+> set the two secrets afterwards):
+>
+> [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SerjShl/video-audio-transcriber)
+
+**Good to know:**
+- Access is gated only by `APP_PASSWORD`. Without it the instance is open to
+  anyone who finds the URL, and they'd spend *your* Groq quota — always set it.
+- The free instance sleeps after ~15 min idle; the next request takes ~30 s to
+  wake it. Fine for occasional personal use.
+- **File upload** is the reliable path in the cloud. YouTube often blocks
+  downloads from datacenter IPs, so pasting a link may fail on the server even
+  though it works on your own machine.
+- The offline `local` engine is intentionally excluded from the deployed image
+  (it needs ~1 GB of model and far more RAM than a free tier gives). It's only
+  for running on your own machine.
+- Any Docker host works the same way (Fly.io, Cloud Run, a VPS): build the
+  image and pass `GROQ_API_KEY`, `APP_PASSWORD`, and `HOST=0.0.0.0`.
 
 ## Project structure
 
 ```
-transcriber/            # Python package
+backend/                # Python package
   config.py             # constants and directory setup
   cli.py                # argument parsing, interactive mode, dispatch
-  server.py             # FastAPI backend with SSE progress
+  server.py             # FastAPI backend with SSE progress + optional password
   deps.py               # external command checks (ffmpeg, yt-dlp)
   download.py           # media download via yt-dlp
   audio.py              # ffmpeg/ffprobe: probe, convert, split
@@ -150,6 +218,8 @@ transcriber/            # Python package
   engines/              # groq (cloud) and local (faster-whisper)
 frontend/               # Vite + React + shadcn/ui web UI
 tests/                  # pytest suite (no external services needed)
+Dockerfile              # container image (frontend build + Python runtime)
+render.yaml             # one-click Render deployment
 ```
 
 ## Development
