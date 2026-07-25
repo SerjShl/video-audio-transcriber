@@ -27,6 +27,6 @@ timeout /t 4 /nobreak >nul
 
 echo.
 echo Publishing to the internet via Tailscale Funnel...
-echo (The public https URL is printed below — share it. Ctrl+C here stops sharing.)
+echo (The public https URL is printed below - share it. Ctrl+C here stops sharing.)
 echo.
 tailscale funnel 8000
