@@ -117,12 +117,13 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 | `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
 | `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3`). |
 | `WHISPER_DEVICE` | `auto` / `cpu` / `cuda` for the local engine. |
-| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). In the web UI each user uploads their own `cookies.txt` per link. |
+| `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). The web UI uses one shared `cookies.txt` uploaded in Settings instead. |
 | `SCAN_CONCURRENCY` | Parallel files in `scan` mode (default 3). |
 | `PORT` | Web server port (default 8000; injected by most PaaS). |
 | `HOST` | Bind address (default `127.0.0.1`; use `0.0.0.0` in a container). |
-| `APP_PASSWORD` | Shared password for the web UI login page. Unset = open; set it on any public deployment. |
+| `APP_PASSWORD` | Shared password for the web UI. Set it → login required; unset → open. This is the only switch for access. Always set it on a public deployment. |
 | `SESSION_SECRET` | Optional key for signing the login cookie (defaults to `APP_PASSWORD`). |
+| `MAX_UPLOAD_MB` | Reject web uploads larger than this (default 4096; `render.yaml` sets 1024 for the free tier). |
 | `PDF_FONT` | Optional path to a Unicode `.ttf` for PDF export (a system font is used otherwise). |
 
 ## How it works
