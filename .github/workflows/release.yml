@@ -1,0 +1,106 @@
+name: Release
+
+# Publishes a ready-to-run archive: the UI is already built, so whoever
+# downloads it needs only Python and ffmpeg - no Node, no build step.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build the archive for (e.g. v2.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the web interface
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Assemble the archive
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          NAME="Transcriber-$TAG"
+          mkdir -p "dist-archive/$NAME/frontend"
+
+          cp -r backend "dist-archive/$NAME/"
+          cp -r frontend/dist "dist-archive/$NAME/frontend/dist"
+          # pyproject reads README.md, so the install fails without it
+          cp pyproject.toml README.md LICENSE "dist-archive/$NAME/"
+          cp Transcriber.bat Transcriber.command "dist-archive/$NAME/"
+
+          find "dist-archive/$NAME" -name '__pycache__' -type d -prune -exec rm -rf {} +
+
+          # cmd.exe wants CRLF; normalise first so this stays idempotent
+          sed -i 's/\r$//' "dist-archive/$NAME/Transcriber.bat"
+          sed -i 's/$/\r/' "dist-archive/$NAME/Transcriber.bat"
+          # the macOS launcher must stay LF and keep its executable bit,
+          # otherwise a double-click does nothing after unzipping
+          sed -i 's/\r$//' "dist-archive/$NAME/Transcriber.command"
+          chmod +x "dist-archive/$NAME/Transcriber.command"
+
+          cd dist-archive
+          zip -r -q "$NAME.zip" "$NAME"
+          echo "ARCHIVE=dist-archive/$NAME.zip" >> "$GITHUB_ENV"
+
+      - name: Verify the archive
+        run: |
+          set -euo pipefail
+          cd dist-archive
+          NAME="Transcriber-$TAG"
+          unzip -q "$NAME.zip" -d verify
+          test -f "verify/$NAME/frontend/dist/index.html"
+          test -f "verify/$NAME/backend/server.py"
+          test -f "verify/$NAME/pyproject.toml"
+          test -x "verify/$NAME/Transcriber.command"
+          # every line of the .bat must end in CRLF
+          if grep -qU $'[^\r]$' "verify/$NAME/Transcriber.bat"; then
+            echo "Transcriber.bat is missing CRLF line endings"; exit 1
+          fi
+          # ...and the .command must not have picked any up
+          if grep -qU $'\r$' "verify/$NAME/Transcriber.command"; then
+            echo "Transcriber.command must stay LF-only"; exit 1
+          fi
+          echo "archive OK: $(du -h "$NAME.zip" | cut -f1)"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<EOF
+          Ready-to-run build: the web interface is already compiled.
+
+          **How to use**
+
+          1. Download and unpack \`Transcriber-$TAG.zip\`
+          2. Double-click \`Transcriber.bat\` (Windows) or \`Transcriber.command\` (macOS)
+
+          The first run creates a virtual environment and installs the Python
+          dependencies, then opens the browser. It needs
+          [Python](https://www.python.org/) 3.10+ and [ffmpeg](https://ffmpeg.org/)
+          installed - Node.js is **not** required for this archive.
+
+          On macOS the first launch may be blocked as an unidentified developer:
+          right-click the file and choose **Open**.
+          EOF
+
+          gh release create "$TAG" "$ARCHIVE" --title "$TAG" --notes-file notes.md \
+            || gh release upload "$TAG" "$ARCHIVE" --clobber
