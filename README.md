@@ -33,8 +33,11 @@ printed at startup, so it's never a silent surprise.
 ## Requirements
 
 - [Python](https://www.python.org/) 3.10 or newer
-- [ffmpeg](https://ffmpeg.org/) (including `ffprobe`) — convert/split audio
+- [ffmpeg](https://ffmpeg.org/) (including `ffprobe`) — convert/split audio; the
+  double-click launchers can fetch it for you if it is missing
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — only needed for URLs
+- [Node.js](https://nodejs.org/) — only to build the web UI from a clone (not
+  needed for the CLI, nor for the release archive)
 - For the `local` engine: optionally an NVIDIA GPU (CUDA) for a big speed-up
 
 > The tool checks for these on startup and tells you what's missing.
@@ -89,7 +92,38 @@ A local web app (Vite + React + [shadcn/ui](https://ui.shadcn.com)) talking to a
 FastAPI backend, with live progress and copy/download of the result. It runs
 entirely on your own machine — no cloud, no account, no password.
 
-Build it once, then start it:
+### Quick start (no command line)
+
+Grab the latest **`Transcriber-<version>.zip`** from
+[Releases](../../releases) — the interface is already built there, so Node.js is
+not needed. Unpack it and **double-click a launcher**: **`Transcriber.bat`** on
+Windows, **`Transcriber.command`** on macOS. (Cloning the repository works too;
+then the first run builds the interface itself and Node.js *is* required.)
+
+On the very first run the launcher sets everything up for you — creates a
+`.venv`, installs the Python dependencies, and (only if you cloned the repo)
+builds the web interface — then starts the server and opens the browser. From
+the release archive that takes well under a minute; later runs start in
+seconds. If something is missing it says exactly what to install and stops,
+instead of failing silently.
+
+Keep the launcher window open while you work — closing it stops the server.
+To put it on your desktop, create a **shortcut/alias** to the file; copying the
+file itself elsewhere breaks it, because it locates the project by its own path.
+
+You need [Python](https://www.python.org/) 3.10+ installed — the launcher cannot
+do that for you, so it opens the download page and tells you to tick *Add
+python.exe to PATH*. **ffmpeg it can handle itself**: if none is found it offers
+to download a private copy into `tools/ffmpeg/` inside the project folder (about
+160 MB to fetch, 280 MB on disk). Nothing is installed system-wide, no PATH is
+changed, and deleting that folder undoes it. On macOS it uses `brew install
+ffmpeg` instead when Homebrew is present.
+
+On macOS the first launch may be blocked as an unidentified developer —
+right-click `Transcriber.command` and choose **Open**; if a double-click does
+nothing after unzipping, run `chmod +x Transcriber.command` once.
+
+### Manual start
 
 ```bash
 cd frontend && npm install && npm run build && cd ..
@@ -97,8 +131,7 @@ transcriber-server        # or: python -m backend.server
 # → http://127.0.0.1:8000
 ```
 
-Or just double-click a launcher — it starts the server and opens the browser:
-**`Transcriber.bat`** on Windows, **`Transcriber.command`** on macOS.
+Set `PORT` to use a different port (default 8000).
 
 Then open http://127.0.0.1:8000 and go to **⚙️ Settings** to:
 - paste your **Groq API key** (free at https://console.groq.com/keys) — needed
@@ -175,8 +208,8 @@ backend/                # Python package
   engines/              # groq (cloud) and local (faster-whisper)
 frontend/               # Vite + React + shadcn/ui web UI
 tests/                  # pytest suite (no external services needed)
-Transcriber.bat         # Windows launcher (double-click)
-Transcriber.command     # macOS launcher (double-click)
+Transcriber.bat         # Windows launcher (double-click: set up, then run)
+Transcriber.command     # macOS launcher (double-click: set up, then run)
 ```
 
 ## Development

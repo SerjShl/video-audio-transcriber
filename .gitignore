@@ -17,6 +17,9 @@ build/
 dist/
 models/
 
+# ffmpeg copy the launchers can download for people who have none
+tools/
+
 # Frontend build output
 frontend/dist/
 frontend/node_modules/

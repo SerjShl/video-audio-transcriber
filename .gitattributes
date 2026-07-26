@@ -2,3 +2,6 @@
 *.bat text eol=crlf
 *.command text eol=lf
 *.sh text eol=lf
+# CI runs the shell blocks inside these on Linux; a stray CR breaks them
+*.yml text eol=lf
+*.yaml text eol=lf
