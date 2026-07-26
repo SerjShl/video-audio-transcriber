@@ -4,15 +4,16 @@
 [![Python](https://img.shields.io/badge/Python-%3E%3D3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Transcribe video and audio into text — from a **URL** (YouTube and hundreds of
-other sites) or from **local files** — either in the **cloud** via the
-[Groq](https://console.groq.com/) Whisper API or **fully offline** via
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+Turn video and audio into text. It reads a URL (YouTube and hundreds of other
+sites) or a local file, and transcribes it either through the
+[Groq](https://console.groq.com/) Whisper API or offline on your own machine
+with [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 
-Use it from the **command line** or from a small **web UI** (drag-and-drop a
-file or paste a link). It handles the tedious parts: downloading, converting to
-audio, compressing oversized files, splitting long recordings into chunks, and
-stitching everything back into a single clean transcript.
+There are two ways to use it: a command-line tool, or a small web UI where you
+drop a file in or paste a link. It takes care of the boring parts, so you don't
+have to: downloading, converting to audio, shrinking files the API would reject,
+cutting long recordings into chunks and stitching the pieces back into one
+transcript.
 
 ## Two engines
 
@@ -46,6 +47,20 @@ printed at startup, so it's never a silent surprise.
 
 ## Installation
 
+### Without a command line
+
+Download `Transcriber-<version>.zip` from [Releases](../../releases), unpack it
+anywhere, and double-click `Transcriber.bat` on Windows or
+`Transcriber.command` on macOS. The first run installs what it needs and opens
+the browser by itself; it takes under a minute, and later runs start in seconds.
+
+Install [Python](https://www.python.org/downloads/) 3.10 or newer first, with
+the *Add python.exe to PATH* box ticked. If ffmpeg is missing the launcher
+offers to download it for you. See [Quick start](#quick-start-no-command-line)
+for the details.
+
+### From source
+
 ```bash
 # system tools
 brew install ffmpeg yt-dlp          # macOS
@@ -61,8 +76,12 @@ pip install ".[server]"             # web UI backend
 pip install ".[local,server,dev]"   # everything + test tools
 ```
 
-For the cloud engine you need a free Groq key: enter it in the web UI
-**Settings**, or (for the CLI) set the `GROQ_API_KEY` env var. Get one at
+Building the web UI from source also needs [Node.js](https://nodejs.org/):
+`cd frontend && npm install && npm run build`. The release archive above ships
+it prebuilt, so Node is not required there.
+
+For the cloud engine you need a free Groq key: enter it in the web UI Settings,
+or set the `GROQ_API_KEY` env var for the CLI. Get one at
 https://console.groq.com/keys.
 
 ## Command-line usage
@@ -90,39 +109,39 @@ transcribe ./private.mp4 ru --engine local      # offline, nothing uploaded
 
 A local web app (Vite + React + [shadcn/ui](https://ui.shadcn.com)) talking to a
 FastAPI backend, with live progress and copy/download of the result. It runs
-entirely on your own machine — no cloud, no account, no login. It binds to
-`127.0.0.1`, so nothing is reachable from outside unless you change `HOST`.
+entirely on your own machine: no cloud, no account, no login. The server binds
+to `127.0.0.1`, so nothing is reachable from outside unless you change `HOST`.
 
 ### Quick start (no command line)
 
-Grab the latest **`Transcriber-<version>.zip`** from
-[Releases](../../releases) — the interface is already built there, so Node.js is
-not needed. Unpack it and **double-click a launcher**: **`Transcriber.bat`** on
-Windows, **`Transcriber.command`** on macOS. (Cloning the repository works too;
-then the first run builds the interface itself and Node.js *is* required.)
+Take the latest `Transcriber-<version>.zip` from [Releases](../../releases). The
+interface is already built inside, so you don't need Node.js. Unpack it and
+double-click `Transcriber.bat` on Windows or `Transcriber.command` on macOS.
+Cloning the repository works too, but then the first run has to build the
+interface, and for that Node.js does have to be installed.
 
-On the very first run the launcher sets everything up for you — creates a
-`.venv`, installs the Python dependencies, and (only if you cloned the repo)
-builds the web interface — then starts the server and opens the browser. From
-the release archive that takes well under a minute; later runs start in
-seconds. If something is missing it says exactly what to install and stops,
-instead of failing silently.
+The first run sets itself up: it creates a `.venv`, installs the Python
+dependencies, builds the interface if you cloned the repo, then starts the
+server and opens the browser. From the release archive that takes under a
+minute, and later runs start in seconds. When something is missing, the window
+tells you what to install and stops there rather than closing on you.
 
-Keep the launcher window open while you work — closing it stops the server.
-To put it on your desktop, create a **shortcut/alias** to the file; copying the
-file itself elsewhere breaks it, because it locates the project by its own path.
+Keep the launcher window open while you work, because closing it stops the
+server. To put it on your desktop, make a shortcut (or an alias on macOS) to the
+file. Copying the file itself somewhere else breaks it, since it finds the
+project by its own location.
 
-You need [Python](https://www.python.org/) 3.10+ installed — the launcher cannot
-do that for you, so it opens the download page and tells you to tick *Add
-python.exe to PATH*. **ffmpeg it can handle itself**: if none is found it offers
-to download a private copy into `tools/ffmpeg/` inside the project folder (about
-160 MB to fetch, 280 MB on disk). Nothing is installed system-wide, no PATH is
-changed, and deleting that folder undoes it. On macOS it uses `brew install
-ffmpeg` instead when Homebrew is present.
+Python 3.10+ has to be installed by hand; the launcher can't do that for you, so
+it opens the download page and reminds you to tick *Add python.exe to PATH*.
+ffmpeg it can handle on its own: if there is none, it offers to download a copy
+into `tools/ffmpeg/` inside the project folder (about 160 MB to fetch, 280 MB on
+disk). That copy is private to the project, nothing is installed system-wide and
+no PATH is touched, so deleting the folder undoes it. On macOS, when Homebrew is
+present, it runs `brew install ffmpeg` instead.
 
-On macOS the first launch may be blocked as an unidentified developer —
-right-click `Transcriber.command` and choose **Open**; if a double-click does
-nothing after unzipping, run `chmod +x Transcriber.command` once.
+macOS may block the first launch as an unidentified developer; right-click
+`Transcriber.command` and choose Open. If a double-click does nothing after
+unzipping, run `chmod +x Transcriber.command` once.
 
 ### Manual start
 
@@ -134,29 +153,30 @@ transcriber-server        # or: python -m backend.server
 
 Set `PORT` to use a different port (default 8000).
 
-Then open http://127.0.0.1:8000 and go to **⚙️ Settings** to:
-- paste your **Groq API key** (free at https://console.groq.com/keys) — needed
-  for the fast cloud engine; the offline `local` engine works without any key;
-- optionally switch the interface language (RU/EN) and add a YouTube `cookies.txt`.
+Then open http://127.0.0.1:8000 and click the Settings button to paste your Groq
+API key (free at https://console.groq.com/keys). The key is what the cloud engine
+runs on; the offline `local` engine needs none. The same dialog switches the
+interface language between Russian and English and takes a YouTube
+`cookies.txt`.
 
 ### Open it like an app
 
 The UI is an installable PWA. In Chrome or Edge, open the site and use the
-install icon in the address bar (or ⋮ menu → **Install / Add to apps**). You get
-a desktop/taskbar icon that launches it in its own window — no address bar, no
-"open the project".
+install icon in the address bar, or the menu entry "Install / Add to apps". You
+end up with a desktop or taskbar icon that opens it in its own window, with no
+address bar and no "open the project" step.
 
 ### Getting a cookies.txt
 
-Only needed when YouTube answers a download with "confirm you're not a bot".
-yt-dlp recommends exporting from an **incognito window** so YouTube doesn't
-rotate (invalidate) the cookies:
+You only need this when YouTube answers a download with "confirm you're not a
+bot". yt-dlp recommends exporting from an incognito window, otherwise YouTube
+rotates the cookies and invalidates them:
 
-1. Install the **"Get cookies.txt LOCALLY"** browser extension (Chrome/Edge/Firefox).
-2. Open a **private/incognito** window and sign in to `youtube.com`.
-3. Open a new tab and **close the YouTube tab** so the session isn't refreshed.
-4. Click the extension → **Export** — it downloads `cookies.txt` (stay in incognito).
-5. Close the incognito window, then upload the file in **Settings → YouTube cookies**.
+1. Install the "Get cookies.txt LOCALLY" browser extension (Chrome/Edge/Firefox).
+2. Open a private window and sign in to `youtube.com`.
+3. Open a new tab, then close the YouTube tab so the session isn't refreshed.
+4. Click the extension and press Export. It saves `cookies.txt`. Stay in incognito.
+5. Close the incognito window, then upload the file in Settings, under YouTube cookies.
 
 For frontend development with hot reload, run the backend and `npm run dev` in
 `frontend/` (it proxies `/api` to the backend). See `frontend/README.md`.
@@ -186,14 +206,14 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 
 ## How it works
 
-1. **Fetch** — download from a URL with yt-dlp, or read a local file.
-2. **Prepare** — for the cloud engine, if the audio is over the API size limit,
-   compress it to mono 16 kHz and, if still too big, split it into time-based
-   chunks. The local engine has no size limit and skips this.
-3. **Transcribe** — send each chunk to the selected engine, retrying transient
-   failures (cloud) with exponential backoff.
-4. **Format** — merge segments into readable paragraphs, subtitle cues, or JSON,
-   and save the transcript to `data/transcripts/`.
+1. Fetch: download from a URL with yt-dlp, or read the local file.
+2. Prepare: for the cloud engine, audio over the API size limit is compressed to
+   mono 16 kHz, and split into time-based chunks if that isn't enough. The local
+   engine has no size limit and skips this step.
+3. Transcribe: send each chunk to the chosen engine. Cloud failures that look
+   transient are retried with exponential backoff.
+4. Format: merge the segments into readable paragraphs, subtitle cues or JSON,
+   and write the transcript to `data/transcripts/`.
 
 ## Project structure
 
@@ -227,24 +247,26 @@ pytest -q               # unit tests
 cd frontend && npm run build   # type-check + build the UI
 ```
 
-Tests cover the pure logic — paragraph formatting, subtitle/JSON rendering, the
-concurrency pool, retry/backoff, argument parsing, engine resolution, segment
-stitching, and a full server job run — so they need no ffmpeg, yt-dlp, or API
-key. CI runs lint + tests on Python 3.10/3.11/3.12 and builds the frontend.
+The tests cover the pure logic: paragraph formatting, subtitle and JSON
+rendering, the concurrency pool, retry and backoff, argument parsing, engine
+resolution, segment stitching, plus one full server job run. None of it needs
+ffmpeg, yt-dlp or an API key. CI runs lint and tests on Python 3.10, 3.11 and
+3.12, and builds the frontend.
 
 ### Cutting a release
 
-Push a `v*` tag and CI builds the UI, packs it with the backend and the
-launchers, and publishes the archive to Releases:
+Bump `version` in `pyproject.toml`, then push a matching `v*` tag. CI builds the
+UI, packs it together with the backend and the launchers, and publishes the
+archive to Releases:
 
 ```bash
-git tag v2.2.0
-git push origin v2.2.0
+git tag v2.3.0
+git push origin v2.3.0
 ```
 
-Bump `version` in `pyproject.toml` to match. The workflow refuses to publish if
-the archive is malformed — no built UI, or launchers with the wrong line endings
-or a missing executable bit.
+The workflow checks the archive before publishing and refuses to release a
+broken one: no built UI, launchers with the wrong line endings, or a missing
+executable bit on the macOS launcher.
 
 ## License
 

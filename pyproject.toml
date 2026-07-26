@@ -1,6 +1,6 @@
 [project]
 name = "video-audio-transcriber"
-version = "2.2.0"
+version = "2.3.0"
 description = "Transcribe videos from a URL (YouTube and hundreds of other sites) or local audio/video files, in the cloud (Groq Whisper) or fully offline (faster-whisper)"
 readme = "README.md"
 requires-python = ">=3.10"
