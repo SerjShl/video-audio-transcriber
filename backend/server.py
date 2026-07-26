@@ -6,18 +6,14 @@ stream progress), which is plenty for a personal, local-only tool.
 """
 
 import asyncio
-import hashlib
-import hmac
 import ipaddress
 import json
 import os
 import re
-import secrets
 import shutil
 import socket
 import sys
 import tempfile
-import time
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -49,17 +45,6 @@ load_dotenv()
 
 _URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 
-# --- session auth (dormant unless APP_PASSWORD is set) ----------------------
-SESSION_COOKIE = "vat_session"
-
-
-def _app_password():
-    return os.environ.get("APP_PASSWORD") or ""
-
-
-def password_configured():
-    return bool(_app_password())
-
 
 def _stored_cookies_path():
     """The single shared cookies.txt for yt-dlp, managed in Settings."""
@@ -73,57 +58,13 @@ def _cookies_meta():
     return {"present": False, "name": None}
 
 
-def auth_required():
-    """Login is required only when APP_PASSWORD is set (off for local use)."""
-    return password_configured()
-
-
-def _session_secret():
-    # Deriving the signing key from APP_PASSWORD means changing the password
-    # instantly invalidates every existing session, with no separate secret.
-    base = os.environ.get("SESSION_SECRET") or _app_password()
-    return base.encode("utf-8")
-
-
-def _make_session_token():
-    return hmac.new(_session_secret(), b"authenticated", hashlib.sha256).hexdigest()
-
-
-def _valid_session(token):
-    return bool(token) and secrets.compare_digest(token, _make_session_token())
-
-
-# --- brute-force throttling for login --------------------------------------
-_LOGIN_WINDOW_S = 300
-_LOGIN_MAX_FAILS = 10
-_login_fails: dict[str, list[float]] = {}
-
-
-def _client_ip(request):
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
-
-
-def _login_blocked(ip):
-    now = time.time()
-    recent = [t for t in _login_fails.get(ip, []) if now - t < _LOGIN_WINDOW_S]
-    _login_fails[ip] = recent
-    return len(recent) >= _LOGIN_MAX_FAILS
-
-
-def _record_login_fail(ip):
-    _login_fails.setdefault(ip, []).append(time.time())
-
-
 # --- SSRF guard for user-supplied URLs -------------------------------------
 def url_targets_private_host(url):
     """True if the URL points at a private/loopback/link-local/metadata host.
 
-    Defence in depth for the URL job: even an authenticated user shouldn't be
-    able to make the server fetch its own cloud metadata or internal services.
-    yt-dlp does its own resolution/redirects, so this is a best-effort check.
+    Defence in depth for the URL job: a pasted link shouldn't be able to make
+    the server fetch its own cloud metadata or internal services. yt-dlp does
+    its own resolution/redirects, so this is a best-effort check.
     """
     try:
         host = urlparse(url).hostname
@@ -269,7 +210,7 @@ async def _run_job(job, params):
 def create_app():
     from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+    from fastapi.responses import FileResponse, StreamingResponse
 
     app = FastAPI(title="Video/Audio Transcriber")
     app.add_middleware(
@@ -279,77 +220,12 @@ def create_app():
         allow_headers=["*"],
     )
 
-    # The API is gated by a signed session cookie whenever a login is required
-    # (a password is configured AND the runtime toggle is on): the user logs in
-    # once via /api/login and the cookie rides along afterwards. The static UI
-    # and the auth/status endpoints stay public so the login screen can load.
-    _public_paths = {"/healthz", "/api/login", "/api/logout", "/api/auth"}
-
-    @app.middleware("http")
-    async def require_login(request: Request, call_next):
-        path = request.url.path
-        # Only the JSON API is gated; the SPA + its assets load freely.
-        if not auth_required() or path in _public_paths or not path.startswith("/api/"):
-            return await call_next(request)
-        if not _valid_session(request.cookies.get(SESSION_COOKIE)):
-            return JSONResponse({"detail": "Authentication required"}, status_code=401)
-        return await call_next(request)
-
     @app.get("/healthz")
     def healthz():
         return {"status": "ok"}
 
-    @app.get("/api/auth")
-    def auth_status(request: Request):
-        """Let the frontend know whether a login is required and if it's done."""
-        required = auth_required()
-        authed = (not required) or _valid_session(request.cookies.get(SESSION_COOKIE))
-        return {
-            "required": required,
-            "authed": authed,
-            "passwordConfigured": password_configured(),
-        }
-
-    @app.post("/api/login")
-    async def login(request: Request):
-        if not auth_required():
-            return {"ok": True}
-        ip = _client_ip(request)
-        if _login_blocked(ip):
-            return JSONResponse(
-                {"detail": "Слишком много попыток. Подождите несколько минут."},
-                status_code=429,
-            )
-        try:
-            body = await request.json()
-        except Exception:
-            body = dict(await request.form())
-        supplied = str(body.get("password", ""))
-        if not secrets.compare_digest(supplied, _app_password()):
-            _record_login_fail(ip)
-            return JSONResponse({"detail": "Неверный пароль"}, status_code=401)
-        _login_fails.pop(ip, None)
-        response = JSONResponse({"ok": True})
-        response.set_cookie(
-            SESSION_COOKIE,
-            _make_session_token(),
-            httponly=True,
-            samesite="lax",
-            secure=request.url.scheme == "https",
-            max_age=60 * 60 * 24 * 30,
-        )
-        return response
-
-    @app.post("/api/logout")
-    def logout():
-        response = JSONResponse({"ok": True})
-        response.delete_cookie(SESSION_COOKIE)
-        return response
-
     def _settings_payload():
         return {
-            "authRequired": auth_required(),
-            "passwordConfigured": password_configured(),
             "groqKeySet": bool(config.groq_api_key()),
             "cookies": _cookies_meta(),
         }

@@ -26,8 +26,6 @@ def client(monkeypatch):
         def ensure_ready(self):
             return None
 
-    # A developer's local .env may set APP_PASSWORD; tests run in open mode.
-    monkeypatch.delenv("APP_PASSWORD", raising=False)
     monkeypatch.setattr(server, "ensure_command", lambda *a, **k: None)
     monkeypatch.setattr(server, "get_engine", lambda name=None: DummyEngine())
     monkeypatch.setattr(
@@ -79,50 +77,6 @@ def test_download_serves_the_result_file(client, tmp_path):
         server._jobs.pop(job.id, None)
 
 
-def test_login_gate_and_flow(monkeypatch):
-    from fastapi.testclient import TestClient
-
-    import backend.server as server
-
-    monkeypatch.setenv("APP_PASSWORD", "s3cret")
-    client = TestClient(server.create_app())
-
-    # The API is gated until login; the status endpoint stays reachable.
-    assert client.get("/api/engines").status_code == 401
-    status = client.get("/api/auth").json()
-    assert status["required"] is True
-    assert status["authed"] is False
-    assert status["passwordConfigured"] is True
-
-    assert client.post("/api/login", json={"password": "wrong"}).status_code == 401
-    assert client.post("/api/login", json={"password": "s3cret"}).status_code == 200
-
-    # The session cookie now rides along on the TestClient's jar.
-    assert client.get("/api/auth").json()["authed"] is True
-    assert client.get("/api/engines").status_code == 200
-
-    client.post("/api/logout")
-    assert client.get("/api/engines").status_code == 401
-
-
-def test_auth_follows_app_password(monkeypatch):
-    from fastapi.testclient import TestClient
-
-    import backend.server as server
-
-    # No password configured → the site is open, no login required.
-    monkeypatch.delenv("APP_PASSWORD", raising=False)
-    open_client = TestClient(server.create_app())
-    assert open_client.get("/api/auth").json()["required"] is False
-    assert open_client.get("/api/engines").status_code == 200
-
-    # Password configured → login is required.
-    monkeypatch.setenv("APP_PASSWORD", "s3cret")
-    gated_client = TestClient(server.create_app())
-    assert gated_client.get("/api/auth").json()["required"] is True
-    assert gated_client.get("/api/engines").status_code == 401
-
-
 def test_rejects_private_url(client):
     res = client.post("/api/jobs", data={"url": "http://localhost/video", "format": "txt"})
     assert res.status_code == 400
@@ -141,28 +95,12 @@ def test_rejects_oversized_upload(client, monkeypatch):
     assert res.status_code == 413
 
 
-def test_login_is_rate_limited(monkeypatch):
-    from fastapi.testclient import TestClient
-
-    import backend.server as server
-
-    monkeypatch.setenv("APP_PASSWORD", "s3cret")
-    monkeypatch.setattr(server, "_login_fails", {})
-    client = TestClient(server.create_app())
-
-    for _ in range(server._LOGIN_MAX_FAILS):
-        assert client.post("/api/login", json={"password": "nope"}).status_code == 401
-    # Further attempts are blocked, even with the correct password.
-    assert client.post("/api/login", json={"password": "s3cret"}).status_code == 429
-
-
 def test_shared_cookies_upload_and_delete(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
     import backend.config as config
     import backend.server as server
 
-    monkeypatch.delenv("APP_PASSWORD", raising=False)
     monkeypatch.setattr(config, "COOKIES_PATH", tmp_path / "cookies.txt")
     monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
     client = TestClient(server.create_app())
@@ -187,7 +125,6 @@ def test_groq_key_set_and_clear(monkeypatch, tmp_path):
     import backend.config as config
     import backend.server as server
 
-    monkeypatch.delenv("APP_PASSWORD", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
     client = TestClient(server.create_app())

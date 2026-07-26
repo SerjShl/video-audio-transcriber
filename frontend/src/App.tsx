@@ -7,7 +7,6 @@ import {
   FileAudio,
   Link2,
   Loader2,
-  LogOut,
   Moon,
   Radio,
   Settings2,
@@ -15,9 +14,8 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 
-import { LoginScreen } from "@/components/LoginScreen";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { Waveform } from "@/components/Waveform";
 import { Badge } from "@/components/ui/badge";
@@ -49,13 +47,6 @@ export default function App() {
   const [uiLang, setUiLang] = useState<UiLang>(getInitialUiLang);
   const t = STRINGS[uiLang];
   const [dark, setDark] = useState(() => localStorage.getItem(STORAGE_KEYS.dark) !== "0");
-
-  const [authChecked, setAuthChecked] = useState(false);
-  const [authRequired, setAuthRequired] = useState(false);
-  const [authed, setAuthed] = useState(false);
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loggingIn, setLoggingIn] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cookies, setCookies] = useState<Cookies>({ present: false, name: null });
@@ -123,7 +114,6 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d) return;
-        setAuthRequired(Boolean(d.authRequired));
         setGroqKeySet(Boolean(d.groqKeySet));
         if (d.cookies) setCookies(d.cookies);
       })
@@ -131,55 +121,9 @@ export default function App() {
   }
 
   useEffect(() => {
-    fetch("/api/auth")
-      .then((r) => r.json())
-      .then((d) => {
-        setAuthRequired(Boolean(d.required));
-        setAuthed(Boolean(d.authed));
-        if (d.authed) {
-          loadEngines();
-          loadSettings();
-        }
-      })
-      .catch(() => {
-        setAuthed(true);
-        loadEngines();
-        loadSettings();
-      })
-      .finally(() => setAuthChecked(true));
+    loadEngines();
+    loadSettings();
   }, []);
-
-  async function submitLogin(e: FormEvent) {
-    e.preventDefault();
-    setLoggingIn(true);
-    setLoginError(null);
-    try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || t.loginFailed);
-      }
-      setAuthed(true);
-      setPassword("");
-      loadEngines();
-      loadSettings();
-    } catch (err) {
-      setLoginError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoggingIn(false);
-    }
-  }
-
-  async function logout() {
-    await fetch("/api/logout", { method: "POST" }).catch(() => {});
-    job.reset();
-    setAuthed(false);
-    setSettingsOpen(false);
-  }
 
   async function saveGroqKey() {
     setGroqBusy(true);
@@ -270,29 +214,6 @@ export default function App() {
     if (job.jobId) window.location.href = `/api/jobs/${job.jobId}/download`;
   }
 
-  if (!authChecked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Waveform bars={7} className="h-8 text-primary" />
-      </div>
-    );
-  }
-
-  if (authRequired && !authed) {
-    return (
-      <LoginScreen
-        t={t}
-        password={password}
-        onPasswordChange={setPassword}
-        onSubmit={submitLogin}
-        error={loginError}
-        submitting={loggingIn}
-        uiLang={uiLang}
-        onUiLang={setUiLang}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8 md:py-12">
@@ -316,11 +237,6 @@ export default function App() {
             <Button variant="ghost" size="icon" onClick={() => setDark((d) => !d)} aria-label={t.a11yTheme}>
               {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            {authRequired && (
-              <Button variant="ghost" size="icon" onClick={logout} aria-label={t.a11yLogout}>
-                <LogOut className="h-5 w-5" />
-              </Button>
-            )}
           </div>
         </header>
 

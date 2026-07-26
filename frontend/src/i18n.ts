@@ -16,7 +16,6 @@ export type Strings = {
   connectionLost: string;
   a11ySettings: string;
   a11yTheme: string;
-  a11yLogout: string;
   source: string;
   tabLink: string;
   tabFile: string;
@@ -44,10 +43,6 @@ export type Strings = {
   copied: string;
   download: string;
   footer: string;
-  loginSubtitle: string;
-  loginPasswordLabel: string;
-  loginSubmit: string;
-  loginFailed: string;
   settingsTitle: string;
   settingsDesc: string;
   uiLangEyebrow: string;
@@ -84,7 +79,6 @@ export const STRINGS: Record<UiLang, Strings> = {
     connectionLost: "Соединение с сервером потеряно",
     a11ySettings: "Настройки",
     a11yTheme: "Тема",
-    a11yLogout: "Выйти",
     source: "Источник",
     tabLink: "Ссылка",
     tabFile: "Файл",
@@ -112,10 +106,6 @@ export const STRINGS: Record<UiLang, Strings> = {
     copied: "Скопировано",
     download: "Скачать",
     footer: "Работает на Whisper (Groq) и faster-whisper",
-    loginSubtitle: "Расшифровка видео и аудио в текст",
-    loginPasswordLabel: "Пароль доступа",
-    loginSubmit: "Войти",
-    loginFailed: "Не удалось войти",
     settingsTitle: "Настройки",
     settingsDesc: "Язык интерфейса, доступ и загрузка с YouTube",
     uiLangEyebrow: "Язык интерфейса",
@@ -160,7 +150,6 @@ export const STRINGS: Record<UiLang, Strings> = {
     connectionLost: "Lost connection to the server",
     a11ySettings: "Settings",
     a11yTheme: "Theme",
-    a11yLogout: "Log out",
     source: "Source",
     tabLink: "Link",
     tabFile: "File",
@@ -188,10 +177,6 @@ export const STRINGS: Record<UiLang, Strings> = {
     copied: "Copied",
     download: "Download",
     footer: "Powered by Whisper (Groq) and faster-whisper",
-    loginSubtitle: "Turn video and audio into text",
-    loginPasswordLabel: "Access password",
-    loginSubmit: "Sign in",
-    loginFailed: "Couldn't sign in",
     settingsTitle: "Settings",
     settingsDesc: "Interface language, access and YouTube downloads",
     uiLangEyebrow: "Interface language",

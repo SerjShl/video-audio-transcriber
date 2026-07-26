@@ -90,7 +90,8 @@ transcribe ./private.mp4 ru --engine local      # offline, nothing uploaded
 
 A local web app (Vite + React + [shadcn/ui](https://ui.shadcn.com)) talking to a
 FastAPI backend, with live progress and copy/download of the result. It runs
-entirely on your own machine — no cloud, no account, no password.
+entirely on your own machine — no cloud, no account, no login. It binds to
+`127.0.0.1`, so nothing is reachable from outside unless you change `HOST`.
 
 ### Quick start (no command line)
 
@@ -173,7 +174,9 @@ For frontend development with hot reload, run the backend and `npm run dev` in
 | `GROQ_API_KEY` | Groq API key. Optional — the web UI stores the key you enter in Settings; this env var is a fallback (handy for CLI use). |
 | `WHISPER_MODEL` | Groq model (default `whisper-large-v3-turbo`). |
 | `WHISPER_LOCAL_MODEL` | faster-whisper model (default `large-v3-turbo` — fast on CPU). |
-| `WHISPER_DEVICE` | `auto` / `cpu` / `cuda` for the local engine. |
+| `WHISPER_DEVICE` | `cpu` (default) / `cuda` / `auto` for the local engine. |
+| `WHISPER_COMPUTE_TYPE` | Precision for the local engine (default `int8` — fastest on CPU). |
+| `KEEP_AUDIO` | Set to `true` to keep downloaded audio by default (same as `--keep`). |
 | `YT_DLP_BROWSER` / `YT_DLP_COOKIES` | Cookies for YouTube "confirm you're not a bot" (CLI). The web UI uses a `cookies.txt` uploaded in Settings instead. |
 | `SCAN_CONCURRENCY` | Parallel files in `scan` mode (default 3). |
 | `PORT` | Web server port (default 8000). |
@@ -208,6 +211,8 @@ backend/                # Python package
   engines/              # groq (cloud) and local (faster-whisper)
 frontend/               # Vite + React + shadcn/ui web UI
 tests/                  # pytest suite (no external services needed)
+tools/                  # not in git: ffmpeg the launcher may download here
+.github/workflows/      # ci.yml (lint + tests + UI build), release.yml (archive)
 Transcriber.bat         # Windows launcher (double-click: set up, then run)
 Transcriber.command     # macOS launcher (double-click: set up, then run)
 ```
@@ -226,6 +231,20 @@ Tests cover the pure logic — paragraph formatting, subtitle/JSON rendering, th
 concurrency pool, retry/backoff, argument parsing, engine resolution, segment
 stitching, and a full server job run — so they need no ffmpeg, yt-dlp, or API
 key. CI runs lint + tests on Python 3.10/3.11/3.12 and builds the frontend.
+
+### Cutting a release
+
+Push a `v*` tag and CI builds the UI, packs it with the backend and the
+launchers, and publishes the archive to Releases:
+
+```bash
+git tag v2.2.0
+git push origin v2.2.0
+```
+
+Bump `version` in `pyproject.toml` to match. The workflow refuses to publish if
+the archive is malformed — no built UI, or launchers with the wrong line endings
+or a missing executable bit.
 
 ## License
 
