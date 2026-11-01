@@ -5,6 +5,10 @@ import subprocess
 from pathlib import Path
 
 from .config import DIRS
+from .deps import stderr_detail
+
+YT_DLP_OUTDATED_MARKER = "Your yt-dlp version"
+YT_DLP_UPDATE_COMMAND = "winget upgrade yt-dlp.yt-dlp"
 
 
 def download_media(url, cookies_file=None) -> Path:
@@ -24,7 +28,13 @@ def download_media(url, cookies_file=None) -> Path:
 
     args += ["--print", "after_move:filepath", "--no-simulate", url]
 
-    result = subprocess.run(args, capture_output=True, text=True, check=True)
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as error:
+        message = f"Download failed: {stderr_detail(error)}"
+        if YT_DLP_OUTDATED_MARKER in (error.stderr or ""):
+            message += f"\nyt-dlp is outdated, update it: {YT_DLP_UPDATE_COMMAND}"
+        raise RuntimeError(message) from error
     # dict.fromkeys de-duplicates while preserving order.
     paths = list(dict.fromkeys(line.strip() for line in result.stdout.splitlines() if line.strip()))
 
